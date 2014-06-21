@@ -808,11 +808,12 @@ sub handlemessage {
     } elsif ($text =~ /!alarm snooze/i) {
       #TODO
     }
-  } elsif ((($text =~ /Ars[ie]no|$irc{nick}|jonadabot/i) or ($howtorespond eq 'private')) and
+  } elsif (((($text =~ /Ars[ie]no|$irc{nick}|jonadabot/i) or ($howtorespond eq 'private')) and
            (($text =~ /are(?:n't)? you (a|an|the|human|\w*bot|puppet)/i) or ($text =~ /(who|what) are you/i)
-            or ($text =~ /(who|what) is (Ars[ie]no|jonadabot)/i))) {
+            or ($text =~ /(who|what) is (Ars[ie]no|jonadabot)/i)))
+           or ($text =~ /^!about/)) {
     my $size = 0; $size += $_ for map { -s $_ } $0, $guts, $utilsubs, $extrasubs, $regexen, $teacode, $dbcode, $watchrod ;
-    say("I am a Perl script, $devname version $version, $size bytes, located at $0.",
+    say("/me is a Perl script, $devname version $version, $size bytes, see also $gitpage",
         channel => $howtorespond, sender => $sender, fallbackto => 'private' );
     say("I was originally written by $author and am currently operated by $irc{oper}, who frequents this same network.",
         channel => $howtorespond, sender => $sender, fallbackto => 'private' );

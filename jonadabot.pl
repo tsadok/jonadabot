@@ -58,6 +58,7 @@ our %friendlytzname   = (# If a timezone isn't listed here, all that happens
 our $devname          = 'jonadabot';
 our $author           = 'Jonadab the Unsightly One';
 our $version          = '006';
+our $gitpage          = 'https://gitorious.org/jonadabot';
 our $logfile          = "/var/log/jonadabot_$version.log";
 our $utilsubs         = "jonadabot_utilsubs.pl";
 our $extrasubs        = "jonadabot_extrasubs.pl";
