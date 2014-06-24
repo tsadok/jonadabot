@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+print "Filewatch Debugging Level $debug{filewatch}\n";
 
 sub watchlogfile {
   my ($demi, $log, $bwhash, $watches) = @_;

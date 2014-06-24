@@ -64,6 +64,7 @@ $q->execute();
 # alarms set by individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS alarm (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     status     integer,
      nick       tinytext,
      sender     tinytext,
      setdate    datetime,
@@ -321,7 +322,7 @@ if ((not getrecord("popserver")) and (yesno("Do you wish to set up email-related
                                mnemonic   => $mnemonic });
         my $popid = $db::added_record_id;
         print qq[A "watch key" is just a short identifier that your jonadabot_regexes.pl\ncan key in when selecting a set of regular expressions to apply.\n];
-        for my $watch (grep { $_ } split /\s*/,
+        for my $watch (grep { $_ } split /\s+/,
                        askuser("Space-separated list of watch keys to apply to this email account")) {
           addrecord("popwatch", +{ popbox => $popid, watchkey => $watch });
           push @regexkey, $watch;

@@ -112,13 +112,21 @@ our %demilichen = map {
 warn "Stage " . (shift @stage) . " (built clan hash)";
 
 our %botwatch;
+use Data::Dumper; warn Dumper(+{ debug => \%debug });
 do $watchlog;
 warn "Stage " . (shift @stage) . " (did file watch)";
-
-for my $log (grep { not $$_{flags} =~ /X/ } getrecord("logfile")) { # X means disabled.
+use Data::Dumper; warn Dumper(+{ debug => \%debug });
+my @log = getrecord("logfile");
+warn "Database contains " . @log . " log files.\n";
+@log = grep { not $$_{flags} or not ($$_{flags} =~ /X/)
+            } @log;
+warn "   Filtered out all but " . @log . " of them.\n";
+for my $log (@log) { # X means disabled.
+  warn "      Considering $$log{mnemonic}\n" if $debug{filewatch};
   logit("Considering $$log{mnemonic} log ($$log{id})", 3) if $debug{filewatch};
   my $logfile = $$log{logfile};
-  my @watch   = grep { not $$_{flags} =~ /X/ } findrecord("logfilewatch", "logfile", $$log{id});
+  my @watch   = grep { not $$_{flags} or not ($$_{flags} =~ /X/)
+                     } findrecord("logfilewatch", "logfile", $$log{id});
   if (@watch) {
     my $pipe;
     open $pipe, "tail -f $logfile |";
@@ -231,9 +239,9 @@ $irc->reg_cb(publicmsg => sub { my ($client, $channel, $ircmsg) = @_;
                                 ($channel, $text) = @{$$ircmsg{params}};
                                 handlemessage($$ircmsg{prefix}, $text, $channel);
              });
-$irc->reg_cb(ctcp => sub { my ($src, $target, $tag, $msg, $type) = @_;
+$irc->reg_cb(ctcp => sub { my ($src, $target, $tag, $msg, $type, $blah) = @_;
                            logit("Callback: ctcp") if $debug{irc} > 3;
-                           handlectcp($src, $target, $tag, $msg, $type);
+                           handlectcp($src, $target, $tag, $msg, $type, $blah);
              });
 
 warn "Stage " . (shift @stage) . " (registered callbacks)";

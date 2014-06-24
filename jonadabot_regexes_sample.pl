@@ -33,6 +33,22 @@
                            [ NH4Trac    => qr/From[:].*scshunt+nh4.csclub[.]uwaterloo[.]ca/, 'readsubject' ],
                           ],
 
+               test =>     [ # intended for testing the biff functionality
+                            [ testone => qr/Subject[:].*jonadabot biff test (one|1)/, 'notify', ],
+                            [ testtwo => qr/Subject[:].*jonadabot biff test (two|2)/, 'readsubject', ],
+                            [ three   => qr/Subject[:].*jonadabot biff test (three|3)/, 'readbody', ],
+                            [ four    => qr/Subject[:].*jonadabot biff test (four|4)/, 'callback', [],
+                              sub { my ($line, %arg) = @_;
+                                    return "regex callback test: $arg{owner}";
+                              }],
+                            [ logtwo  => qr/jonadabot (log) test (two|2)/, undef, [qw(ttype tnum)], ],
+                            [ logthr  => qr/jonadabot (log) test (three|3)/, undef, [qw(ttype tnum)], ],
+                            [ logfour => qr/jonadabot (log) test (four|4)/, undef, [qw(ttype tnum)],
+                              sub { my ($line, %arg) = @_;
+                                    return " n/v pairs: " . join "; ", map { $_ . " => " . $arg{$_} } keys %arg;
+                                  } ],
+                           ],
+
                Rodney => [# This watch key is designed to be assigned to an irssi logfile of #nethack
                           [ Death  => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)], (\d+) points, T:(\d+), (.*)/,
                                       undef, [qw(player score turn killer)], sub { my ($line, %matchvar) = @_;

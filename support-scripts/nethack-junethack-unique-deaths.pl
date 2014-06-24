@@ -262,7 +262,7 @@ $keytable
   my $cl = $_;
   qq[<div class="clanexclusive"><div class="h"><a name="excl$cl">Exclusive deaths unique to
         <span class="$clanclass{$cl}$classcnt{$cl}">$cl</span></a> ($exclusive{$cl}): </div>
-  ] . (join qq[ <span class="$clanclass{$cl}$classcnt{$cl}">/</span> ],
+  ] . (join qq[&nbsp;<span class="$clanclass{$cl}$classcnt{$cl}">/</span> ],
        map { qq[<span class="excldeath">$_</span>] }
        @{$exclist{$cl}}) . qq[</div>]
 } sort {

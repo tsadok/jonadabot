@@ -261,18 +261,20 @@ sub temperature {
 sub juice {
   my (%arg) = @_;
   $arg{recipient} ||= 'jonadab';
-  my @fruit = ('apple', 'green apple', 'peach', 'plum', 'quince', 'pear', 'nectarine',
-               'orange', 'lemon', 'lime', 'tangerine', 'tangelo', 'pomelo',
+  my @fruit = ('apple', 'green apple', 'crabapple', 'peach', 'plum', 'quince', 'pear', 'nectarine', 'apricot',
+               'cherry', 'black cherry', 'red cherry', 'white cherry', 'acerola', 'wild cherry',
+               'orange', 'lemon', 'lime', 'tangerine', 'tangelo', 'pomelo', 'citron', 'clementine',
                'grapefruit', 'pink grapefruit', 'white grapefruit',
                'strawberry', 'blueberry', 'blackberry', 'raspberry', 'black raspberry', 'red raspberry',
-               'cranberry', 'boysenberry', 'mulberry', 'huckleberry', 'hawberry',
-               'grape', 'white grape', 'concord grape', 'raisin', 'prune', 'fig',
+               'cranberry', 'boysenberry', 'mulberry', 'huckleberry', 'hawberry', 'elderberry', 'gooseberry',
+               'watermelon', 'cantaloupe', 'honeydew',
+               'grape', 'white grape', 'concord grape', 'raisin', 'prune', 'fig', 'tamarind',
                'guava', 'kiwi', 'mango', 'papaya', 'passion fruit', 'pineapple', 'pawpaw', 'persimmon',
-               'cayenne pepper', 'breadfruit', 'potato', 'onion', 'radish',
-               'olive', 'habanero pepper seed', 'avacado',
-               'banana', 'coconut', 'cashew', 'pomegranate', 'starfruit',
-               'carrot', 'tomato', 'cucumber', 'celery', 'cabbage', 'watercress', 'nightshade',
-               'slime mold',
+               'cayenne pepper', 'breadfruit', 'potato', 'onion', 'radish', 'dill pickle', 'loquat',
+               'olive', 'habanero pepper seed', 'avacado', 'currant', 'kumquat', 'pumpkin', 'rambutan',
+               'banana', 'coconut', 'cashew', 'pomegranate', 'starfruit', 'prickly pear', 'soursop', 'durian',
+               'carrot', 'tomato', 'cucumber', 'celery', 'cabbage', 'watercress', 'rhubarb', 'zucchini',
+               'nightshade', 'slime mold', 'death',
               );
   my $numoffruits = 1 + int rand int rand 3;
   my $fruits      = join " ", uniq(map { $fruit[rand @fruit] } 1 .. $numoffruits);

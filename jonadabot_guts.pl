@@ -5,11 +5,12 @@ use AnyEvent::IRC::Util qw(encode_ctcp);
 
 our %demilichen; # populated later
 our %debug = (
+              alarm      => 7,
               biff       => 1,
               connect    => 2,
               ctcp       => 1,
               echo       => 0,
-              filewatch  => 1,
+              filewatch  => 3,
               groupnick  => 0,
               irc        => 0,
               login      => 0,
@@ -125,7 +126,7 @@ sub settimer {
                                         if (@notification) {
                                           processnotification();
                                         } else {
-                                          biff() if not $count++ % 25;
+                                          biff($irc{oper}) if not $count++ % 25;
                                         }
                                       }
                                      );
@@ -142,7 +143,31 @@ sub settimer {
                                           }
                                         }
                                        );
+  $irc{timer}{alarms} = AnyEvent->timer(
+                                        after    => 5,
+                                        interval => (60 * (getconfigvar($cfgprofile, 'alarmresminutes') || 5)),
+                                        cb       => sub { checkalarms(); },
+                                       );
   # additional timers could be added here for more features.
+}
+
+sub checkalarms {
+  my $now   = DateTime->now(@tz);
+  my $dbnow = DateTime::Format::ForDB($now);
+  my @alarm = grep { $$_{alarmdate} le $dbnow } findrecord('alarm', 'status', 0);
+  if (@alarm) {
+    @alarm = grep { (not $$_{snoozetill}) or ($$_{snoozetill} le $dbnow) } @alarm;
+    for my $alarm (@alarm) {
+      my $ftime = friendlytime($now, getircuserpref($$alarm{nick}, 'timezone')|| $prefdefault{timezone});
+      my $says  = ($$alarm{sender} eq $$alarm{nick}) ? '' : qq[$$alarm{sender} says];
+      say("It's ${ftime}: [$$alarm{id}] $says$$alarm{message}", sender => $$alarm{nick}, channel => 'private');
+      # TODO: if the user's not ON at the moment, enqueue a !tell instead
+      $$alarm{viewcount}++;
+      $$alarm{viewed} = $dbnow;
+      $$alarm{status} = 1;
+      updaterecord('alarm', $alarm);
+    }
+  }
 }
 
 sub doscript {
@@ -291,7 +316,8 @@ sub say {
       }
       $irc->send_srv(PRIVMSG => $arg{channel}, $message);
     } elsif ($arg{fallbackto} eq 'private') {
-      $message =~ s~^/me ~$irc{nick}[0] ~;
+      #$message =~ s~^/me (.*)~$irc{nick}[0] $1~;
+      $message =~ s!^/me (.*)!ACTION $1!;
       $irc->send_srv(PRIVMSG => $arg{sender}, $message);
     }
   } else {
@@ -316,11 +342,15 @@ sub say {
 
 sub getircuserpref {
   my ($user, $var) = @_;
-  my $r = grep { $$_{prefname} eq $var } findrecord('userpref', 'username', $user);
-  if (ref $r) {
-    return $$r{value};
+  if ($user) {
+    my $r = grep { $$_{prefname} eq $var } findrecord('userpref', 'username', $user);
+    if (ref $r) {
+      return $$r{value};
+    } else {
+      return $prefdefault{$value};
+    }
   } else {
-    return $prefdefault{$value};
+    carp("Can't get irc user pref without a nick");
   }
 }
 
@@ -455,19 +485,18 @@ sub debuginfo {
 }
 
 sub handlectcp {
-  my ($src, $target, $tag, $msg, $type) = @_;
+  my ($self, $target, $tag, $msg, $type, $blah) = @_;
   my $respond = 0;
-  my $srcdmp = Dumper($src); # TODO: We need to get a nick out of $src
-  logit("handlectcp($srcdmp, $target, $tag, $msg, $type)");
-  updatepingtimes($src, 'ctcp', $tag);
+  logit("handlectcp(self, $target, $tag, $msg, $type, $blah)");
+  updatepingtimes($target, 'ctcp', $tag);
   if ($type eq 'NOTICE') { # The CTCP message was in a channel.  Only respond if sender is a master.
-    $respond = ($irc{master}{$src}) ? 1 : 0;
+    $respond = ($irc{master}{$target}) ? 1 : 0;
   } elsif ($type eq 'PRIVMSG') { # The CTCP message was private.  Respond privately (if it's a tag we respond to).
     $respond = 1;
   }
-  $respond++ if $irc{master}{$src}; # If the sender is our master, we may respond to some tags we otherwise would not.
+  $respond++ if $irc{master}{$target}; # If the sender is our master, we may respond to some tags we otherwise would not.
   my $response = undef;
-  logit("CTCP from $src, tag $tag, type $type, target $target, respond $respond, msg $msg");# if $debug{ctcp};
+  logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg");# if $debug{ctcp};
   if ($tag eq 'VERSION') {
     my $perlver  = ($] ge '5.006') ? (sprintf "%vd", $^V) : $];
     $response = qq[$devname $version / Perl $perlver];
@@ -475,7 +504,7 @@ sub handlectcp {
     my $dt       = DateTime->now(@tz);
     $response = $dt->year() . ' ' . $dt->month_abbr() . ' ' . $dt->mday() . ' at ' . ampmtime($dt) . ' ' . friendlytz($dt);
   } elsif ($tag eq 'PING') {
-    if ($irc{master{$src}}) {
+    if ($irc{master{$target}}) {
       # TODO: support PING fully
     } else {
       # TODO: support PING in a safer, more minimal way.
@@ -483,7 +512,7 @@ sub handlectcp {
   } # TODO: DCC support might be a useful way to deliver things like backscroll.
   logit("handlectcp: respond $respond, response $response", 3) if $debug{ctcp};
   if ($respond and $response) {
-    say(encode_ctcp($tag, $response), channel => 'private', sender => $src);
+    say(encode_ctcp($tag, $response), channel => 'private', sender => $target);
   }
 }
 
@@ -491,7 +520,8 @@ sub handlemessage {
   my ($prefix, $text, $howtorespond) = @_;
   # howtorespond should either be 'private' or a channel
   # The prefix is raw, as received by the callback.
-  my $sender = parseprefix($prefix, qq[handlemessage('$prefix', '$text', '$howtorespond')]);
+  my $sender = parseprefix($prefix, qq[handlemessage('$prefix', '$text', '$howtorespond')]) || '__NO_SENDER__';
+  logit("parseprefix DRIBBLE: $prefix") if not $sender;
   my $fallbacktoprivate = 0;
   my $now = DateTime->now( @tz );
   # $irc{channel}{lc $howtorespond}{seen}{lc $sender} = $now; # Note that 'private' is treated as a channel.
@@ -738,8 +768,9 @@ sub handlemessage {
       $fallbacktoprivate = 1;
     } elsif (@s) {
       my $s = $s[0];
-      $answer = "/me last saw $$s{nick} in $$s{channel} " . friendlytime(DateTime::From::MySQL($$s{whenseen}),
-                                                                         getircuserpref($sender, 'timezone')) . ".";
+      $answer = "/me last saw $$s{nick} in $$s{channel} "
+        . friendlytime(DateTime::Format::MySQL->parse_datetime($$s{whenseen}),
+                       getircuserpref($sender, 'timezone')) . ".";
     }
     if (($howtorespond eq 'private') or ($irc{okdom}{$howtorespond})) {
       say($answer, channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
@@ -755,64 +786,94 @@ sub handlemessage {
     my ($blah) = $text =~ /^!rot13\s*(.*)/i;
     $blah =~ tr/A-Za-z/N-ZA-Mn-za-m/;
     say("!ebg13 $blah", channel => $howtorespond, sender => $sender, fallbackto => 'private');
-  } elsif ($text =~ /^!alarm/) {
-    # TODO: make alarms actually /msg you when the time comes, handled probably out of processnotifications() or so.
+  } elsif ($text =~ /^!alarm/i) {
+    logit($text) if $debug{alarm};
+    say("Hmm...", channel => 'private', sender => $sender) if $debug{alarm} > 6;
     # TODO: document this feature in !help
-    if ($text =~ m~^!alarm set\s*
-                   # optional date:
-                   (on\s*
-                     (?:\d{4}[-/])?   # optional year
-                     (?:\w{2,3}[-/])? # optional month
-                     \d+              # day of month
-                   )?\s* # end of optional date
-                   # time (minutes and seconds optional):
-                   (?:at)?\s*(\d+[:]?\d*[:]?\d*)\s*
-                   (am|pm)?\s*
-                   # alarm message:
-                   (.+)
-                  ~xi) {
-      my ($ondate, $time, $ampm, $alarm) = ($1, $2, $3, $4);
-      if ($alarm) {
-        my $now = DateTime->now(@tz);
-        $ondate =~ m~on\s*
-                     (?:(\d{4})[-/])?
-                     (?:(\w{2,3})[-/])?
-                     (\d+)~x;
-        my ($year, $month, $mday) = ($1, $2, $3);
-        my $mnum; my %mrassq = ( Jan => 1, Feb => 2, Mar => 3, Apr => 4,  May => 5,  Jun => 6,
-                                 Jul => 7, Aug => 8, Sep => 9, Oct => 10, Nov => 11, Dec => 12 );
-        if (($month =~ /^\d+$/) and ($month eq int $month) and ($month >= 1) and ($month <= 12)) {
-          $mnum = $month;
-        } elsif ($mrassq{ucfirst lc $month}) {
-          $mnum = $mrassq{ucfirst lc $month}
+    if ($text =~ m~^!alarm set (.+)~i) {
+      my ($setparams) = ($1);
+      if ($setparams =~ m~(today|tomorrow|Sun|Mon|Tue|Wed|Thu|Fri|Sat|(?:\d*[-]?\s*(?:the|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*\d+(?:st|nd|rd)?))\s*(?:at)?\s*(\d+[:]?\d*[:]?\d*\s*(?:am|pm)?)\s*(.*)~i) {
+        my ($datepart, $timepart, $message) = ($1, $2, $3);
+        my $thedate = DateTime->now(@tz);
+        if ($datepart =~ /tomorrow/) {
+          $thedate = $thedate->add( days => 1 );
+        } elsif ($thedate =~ /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)/i) {
+          my $dow = $1;
+          while ($thedate->day_abbr ne ucfirst lc $dow) {
+            $thedate = $thedate->add( days => 1 );
+          }
+        } elsif ($thedate =~ /(\d*)[-]?\s*(The|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*(\d+)(?:st|nd|rd)?/i) {
+          my ($yr, $mo, $md) = ($1, $2, $3);
+          $yr ||= $thedate->year();
+          my %monum = ( Jan => 1,  Feb => 2, Mar => 3, Apr =>  4, May =>  5, Jun =>  6,
+                        Jul => 7,  Aug => 8, Sep => 9, Oct => 10, Nov => 11, Dec => 12, );
+          my $month = $monum{$mo} || $thedate->month();
+          $thedate = DateTime->new( year => $yr, month => $month, day => $md, @tz);
         }
-        ($hour, $min, $sec) = split /[:]/, $time;
-        if (lc $ampm eq 'am') {
-          $hour = 0 if $hour eq 12;
-        } elsif (lc $ampm eq 'pm') {
-          $hour += 12 unless $hour eq 12;
+        $timepart =~ m~(\d+)[:]?(\d*)[:]?(\d*)\s*(am|pm|)~i;
+        my ($hr, $mn, $sc, $ampm) = ($1, $2, $3, $4);
+        if ($ampm eq 'pm') {
+          $hr += 12 unless $hr > 11;
+        } elsif ($ampm eq 'am') {
+          $hr = $hr % 12;
         }
-        my $dt = DateTime->new( year    => $year || $now->year(),
-                                month   => $mnum || $now->month(),
-                                day     => $mday,
-                                hour    => $hour,
-                                minute  => $min || 0,
-                                second  => $sec || 0,
-                                @tz);
+        my $dt = DateTime->new( year => $thedate->year(), month => $thedate->month(), day => $thedate->mday(),
+                                hour => $hr, minute => ($mn || 0), second => ($sc || 0), @tz);
         $alarm ||= "It's " . friendlytime($dt) . "!";
-        setalarm($dt, $alarm, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+        setalarm($dt, $message, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } else {
-        say("Sorry, I did not understand your alarm.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private' );
+        say("Sorry, I did not understand that date and time.", channel => 'private', sender => $sender);
       }
     } elsif ($text =~ /!alarm snooze/i) {
       #TODO
+    } elsif ($text =~ /!alarm (\d+)\s*(.*)/) {
+      my ($num, $rest) = ($1, $2);
+      my $alarm = getrecord('alarm', $num);
+      if (not $alarm) {
+        say("No such alarm: $num", channel => 'private', sender => $sender);
+      } elsif (lc($$alarm{nick}) ne lc $sender) {
+        say("Not your alarm: $num", channel => 'private', sender => $sender);
+      } else {
+        my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
+                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone});
+        say("Alarm $$alarm{id} viewed " . ($$alarm{viewcount} || 0) . " time(s), "
+            . ($$alarm{status} ? 'inactive' : "set to go off $forwhen") . ".",
+            channel => 'private', sender => $sender);
+        my $willsay = $alarm{status} ? "said" : "will say";
+        say(qq[Alarm $willsay "$$alarm{message}".], channel => 'private', sender => $sender);
+      }
+    } elsif ($text =~ /!alarms\s*(.*)/) {
+      my @extraarg = split /\s+/, $1;
+      my @alarm = findrecord('alarm', 'nick', $sender);
+      if (grep { /inactive/ } @extraarg) {
+        @alarm = grep { $$_{status} } @alarm;
+      } else {
+        @alarm = grep { not $$_{status} } @alarm;
+      }
+      my $dbnow = DateTime::Format::ForDB(DateTime->now(@tz));
+      if (grep { /future/ } @extraarg ) {
+        @alarm = grep { $$_{alarmdate} ge $dbnow } @alarm;
+      } elsif (grep { /past/ } @extraarg) {
+        @alarm = grep { $$_{alarmdate} le $dbnow } @alarm;
+      }
+      if (0 >= scalar @alarm) {
+        say("You currently have no " . (@extraarg ? "(@extraarg) " : '') . "alarms set.",
+            channel => 'private', sender => $sender);
+      } elsif (1 == scalar @alarm) {
+        my $alarm = $alarm[0];
+        my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
+                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone});
+        say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
+      } else {
+        say("" . @alarm . " alarms: " . (join ", ", map { $$_{id} } @alarm),
+            channel => 'private', sender => $sender);
+      }
     }
   } elsif (((($text =~ /Ars[ie]no|$irc{nick}|jonadabot/i) or ($howtorespond eq 'private')) and
            (($text =~ /are(?:n't)? you (a|an|the|human|\w*bot|puppet)/i) or ($text =~ /(who|what) are you/i)
             or ($text =~ /(who|what) is (Ars[ie]no|jonadabot)/i)))
            or ($text =~ /^!about/)) {
-    my $size = 0; $size += $_ for map { -s $_ } $0, $guts, $utilsubs, $extrasubs, $regexen, $teacode, $dbcode, $watchrod ;
+    my $size = 0; $size += $_ for map { -s $_ } $0, $guts, $utilsubs, $extrasubs, $regexen, $teacode, $dbcode, $watchlog ;
     say("/me is a Perl script, $devname version $version, $size bytes, see also $gitpage",
         channel => $howtorespond, sender => $sender, fallbackto => 'private' );
     say("I was originally written by $author and am currently operated by $irc{oper}, who frequents this same network.",
@@ -903,20 +964,35 @@ sub handlemessage {
             channel => 'private', sender => $sender );
       }
     }
-  } elsif ($text =~ /^!biff/ and $irc{master}{$sender}) {
+  } elsif ($text =~ /^!biff/) {
+    logit("!biff command from $sender: $text") if $debug{biff} > 1;
+    my @box = findrecord("popbox", "ownernick", $sender);
+    my %box = map { $$_{mnemonic} => $_ } @box;
     if ($text =~ /^!biff reset/) {
-      $pop3{$_}{count} = 0 for keys %pop3;
+      logit("Doing !biff reset for $sender (" . @box . " mailboxes)") if $debug{biff};
+      for my $box (@box) {
+        $$box{count} = 0;
+        updaterecord("popbox", $box);
+      }
     } elsif ($text =~ /^!biff list/) { # list accounts
-      my @confkey = sort { $a cmp $b } keys %pop3;
-      say("@confkey", channel => 'private', sender => $sender );
-    } elsif ($text =~ /^!biff reload/) {
+      logit("Listing mailboxes for $sender") if $debug{biff};
+      if (@box) {
+        say(("Your POP3 mailboxes: " . join ", ", map { $$_{mnemonic} } @box),
+            channel => 'private', sender => $sender );
+      } else {
+        say("No POP3 mailboxes for $sender", channel => 'private', sender => $sender);
+      }
+    } elsif ($text =~ /^!biff reload/ and $irc{master}{$sender}) {
+      logit("Attempting !biff reload at request of $sender");
       do "jonadabot_regexes.pl";
       # TODO: also reload the account info from the database.  Or, better, do that when it's used.
-      say("Reloaded POP3 account information and watch regexes.", channel => 'private', sender => $sender);
-    } elsif ($text =~ /!biff (\w+)/ and $pop3{$1}) {
+      say("Reloaded watch regexes.", channel => 'private', sender => $sender);
+    } elsif ($text =~ /!biff (\w+)/ and ($box{$1})) {
       my $popbox = $1;
+      logit("!biff request for box $popbox", 3) if $debug{biff} > 1;
       if ($text =~ /!biff $popbox (\d+)\s*(.*)/) {
         my ($msgnum, $therest) = ($1, $2);
+        logit("request is for message $msgnum", 4) if $debug{biff} > 2;
         my (@field) = split /\s+/, $therest;
         push @field, 'Subject' if not @field;
         for my $field (grep { $_ ne uc $_ } @field) { # mixed-case fields are header fields
@@ -972,8 +1048,11 @@ sub handlemessage {
         my $count   = biffhelper($popbox, undef, ['COUNT']);
         say("$count messages waiting in $popbox", channel => 'private', sender => $sender);
       }
-    } else {
-      biff($sender);
+    } elsif ($irc{master}{$sender}) {
+      # TODO: audit biff() to ensure they can only get their own mail,
+      # then remove the master requirement here.
+      logit("That's a general biff check request from $sender", 3) if $debug{biff} > 2;
+      biff($sender, 'saycount');
     }
   } elsif ($text =~ /^!notifications/ and $irc{master}{$sender}) {
     my $n = scalar @notification;
@@ -1073,7 +1152,7 @@ sub viewmessage {
   my $r = getrecord('memorandum', $arg{number});
   if ($$r{target} eq $arg{sender}) {
     my $dt = DateTime::Format::FromDB($$r{thedate});
-    my $date = friendlytime($dt, getircuserpref($$r{target}, 'timezone'));
+    my $date = friendlytime($dt, getircuserpref($$r{target}, 'timezone') || $prefdefault{timezone});
     say(qq[$sender: $$r{sender} says, $$r{message} (in $$r{channel}, $date)], %arg);
     $$r{status} = 2;
     $$r{statusdate} = DateTime::Format::ForDB(DateTime->now(@tz));
@@ -1230,28 +1309,32 @@ sub biffhelper {
 }
 
 sub biff {
-  my ($saycount) = @_;
+  my ($owner, $saycount) = @_;
   my $total = 0;
-  my @confkey = keys %pop3;
+  logit("biff($owner, $saycount)", 4) if $debug{biff} > 2;
+  my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
   for my $confkey (@confkey) {
     logit("Biff: checking POP3: $confkey", 2);
     my $count = biffhelper($confkey);
+    logit("Count for $confkey: $count") if $debug{biff} > 3;
     $total += $count;
     logit("Biff Count: $count ($confkey)") if $debug{pop3} > 1;
   }
   if ($saycount) {
+    logit("Biff count total for $owner: $total") if $debug{biff} > 4;
     say("Total of $total messages in " . @confkey . " POP3 account(s).",
-        channel => 'private', sender => $saycount);
+        channel => 'private', sender => $owner);
   }
 }
 
-sub biffwatch {
+sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
+  # TODO:  allow the same bot to watch mail for and notify multiple users.
   my ($ckey, $category, $headers, $popnum) = @_;
   my $n = scalar @$headers;
   logit("biffwatch($ckey, $category, [$n], $popnum)", 5) if $debug{biff} >= 4;
-  if ($biffwatch{$category}) {
-    for my $sc (@{$biffwatch{$category}}) {
-      my ($subcat, $regex, $action) = @$sc;
+  if ($watchregex{$category}) {
+    for my $sc (@{$watchregex{$category}}) {
+      my ($subcat, $regex, $action, $fields, $callback) = @$sc;
       $action ||= 'notify';
       my @match = grep { $_ =~ $regex;
                        } @$headers;
@@ -1261,13 +1344,22 @@ sub biffwatch {
         logit("biffwatch: matched $scname ($detail)", 6) if $debug{biff} >= 4;
         if ($action eq 'notify') {
           biffnotify($ckey, $category, $detail, $headers, $popnum);
+        } elsif ($action eq 'readsubject') {
+          my @subj = grep { /^Subject[:]/ } @$headers;
+          if ($irc{maxlines} < scalar @subj) {
+            my $nmore = 0;
+            while ($irc{maxlines} <= scalar @subj) { pop @subj; $nmore++; }
+            push @subj, "($nmore additional Subject lines not shown.)";
+          }
+          say($_,  channel => 'private', sender => $irc{oper});
         } elsif ($action eq 'readbody') {
           say("New $scname message [$detail] ($ckey:$popnum):", channel => 'private', sender => $irc{oper} );
           biffnotify($ckey, $category, $detail, $headers, $popnum);
-          my $conf = $pop3{$ckey};
-          my $pop = new Mail::POP3Client( USER      => $$conf{user},
-                                          PASSWORD  => $$conf{pass},
-                                          HOST      => $$conf{server});
+          my $box = findrecord('popbox', 'mnemonic', $ckey);
+          my $srv = getrecord('popserver', $$box{server});
+          my $pop = new Mail::POP3Client( USER      => $$box{popuser},
+                                          PASSWORD  => $$box{poppass},
+                                          HOST      => $$srv{serveraddress});
           if (ref $pop) {
             if ($pop->Connect() >= 0) {
               my $count = $pop->Count();
@@ -1375,6 +1467,20 @@ sub processnotification {
 
 sub setalarm {
   my ($dt, $text, %arg) = @_;
-  # TODO: store the alarm in the database
-  # TODO: tell the user we have done so.
+  my $alarm = +{ nick      => ($arg{nick} || $arg{sender}),
+                 sender    => $arg{sender},
+                 setdate   => DateTime::Format::ForDB(DateTime->now(@tz)),
+                 alarmdate => DateTime::Format::ForDB($dt),
+                 message   => ($text || "Alarm!"),
+                 status    => 0, # 0 = active; 1 = inactive
+               };
+  $alarm{nick} = $alarm{sender} unless $irc{master}{$arg{sender}};
+  my $result = addrecord("alarm", $alarm);
+  my $id = $db::added_record_db;
+  if ($result) {
+    say("Alarm set for " . (friendlytime($dt), getircuserpref($arg{nick}, 'timezone') || $prefdefault{timezone})
+        . " ($id)", %arg);
+  } else {
+    say("Failed to set alarm", %arg);
+  }
 }
