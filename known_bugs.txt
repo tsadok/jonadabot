@@ -1,0 +1,20 @@
+Known bugs:
+ * Setting alarms does not correctly handle a user's timezone preference.
+ * Logfile watching is broken since the 005 => 006 transition.
+
+Features Wanted:
+ * TODO-list management:
+     !todo set Remember to blah blah blah
+     !todo list (just list the id numbers of your todo items)
+     !todo finished nnn (mark item #nnn as complete)
+     !todo first (report the first item)
+     !todo nnn (report todo item #nnn)
+     !todo (report a random todo item from your set)
+ * In okdom channels, answer things like "hi" or "hello"
+     with a configurable channel-specific message (if set)
+     or a semi-random generic greeting (otherwise).
+ * Add a watch regex for demogorgon's "killed the ghost of"
+     that only does anything if the ghost is from your clan.
+ * Play hangman and scrambled word games.
+ * Implement recurring alarms.
+ * Basic numerical calculations.
