@@ -22,9 +22,17 @@
                #         against clan membership roles to determine if the message is relevant; however,
                #         all of them will be used to construct name => value pairs for the callback.
                # callback, if specified, will be treated as a coderef and called any time there's a match.
-               #         as arguments, it will be passed the whole line followed by name/value pairs
-               #         based on the field list and the match variables in the regex.  If it returns
-               #         a string, that string will be sent along with (following) the matched line.
+               #         As arguments, it will be passed the whole line followed by name/value pairs.
+               #         If called by biff because of an email match, the named values will be owner
+               #         (the irc nick of the mailbox owner) and possibly others in the future.
+               #         If called due to a log file line match, the name/value pairs will be based
+               #         on the field list and the match variables in the regex.
+               #         Either way, if the callback returns a string, the match is considered good,
+               #         and the returned string will be sent following the matched line.  If the
+               #         callback returns 1, only the matched matched line will be sent.  If the
+               #         callback returns false, the matched line will NOT be sent (it will be
+               #         considered a no-good match).  Thus, the regex can match things that you
+               #         don't necessarily really want to match, and the callback can reject them.
 
                nethack => [# For example, this watch key might be assigned to any email account where you
                            # might receive email about NetHack (and would want to be notified right away).
@@ -51,16 +59,21 @@
 
                Rodney => [# This watch key is designed to be assigned to an irssi logfile of #nethack
                           [ Death  => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)], (\d+) points, T:(\d+), (.*)/,
-                                      undef, [qw(player score turn killer)], sub { my ($line, %matchvar) = @_;
-                                                                                  if ($matchvar{killer} eq 'ascended') {
-                                                                                    return $routine{congrats}->();
-                                                                                  } else { return; }
-                                                                                }, ],
+                                      undef, [qw(player score turn killer)],
+                            sub { my ($line, %matchvar) = @_;
+                                  if (isclanmember($matchvar{player})) {
+                                    if ($matchvar{killer} eq 'ascended') {
+                                      return $routine{congrats}->(); # match and followup
+                                    } else { return 1; } # just match
+                                  } else { return; } # no match after all, this is not one of our players
+                                },],
                           [ Wish   => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)] wished for ["]([^"]*)["], on turn (\d+)/,
-                                      undef, [qw(player wish turn)]],
+                                      undef, [qw(player wish turn)] sub { return isclanmember($matchvar{player}) ? 1 : undef }],
                           [ AoLS   => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)] averted death, on turn (\d+)/,
-                                      undef, [qw(player turn)], ],
+                                      undef, [qw(player turn)], sub { return isclanmember($matchvar{player}) ? 1 : undef } ],
                           [ Achiev => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)] (performed the invocation|entered the Planes), on turn (\d+)/,
-                                      undef, [qw(player achievement turn)], sub { return $routine{ganbatte}->(); } ],
+                                      undef, [qw(player achievement turn)],
+                            sub { return isclanmember($matchvar{player}) ? $routine{ganbatte}->() : undef; } ],
                         ],
               );
+

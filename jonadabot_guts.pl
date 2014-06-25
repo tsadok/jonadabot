@@ -104,6 +104,11 @@ sub error {
   logit("ERROR: $errortype: $message");
 }
 
+sub isclanmember {
+  my ($username) = @_;
+  return findrecord('clanmembersrvacct', 'serveraccount', $username);
+}
+
 sub settimer {
   my $count;
   $irc{fork} = AnyEvent::ForkManager->new( max_workers => 12 );
@@ -521,6 +526,7 @@ sub handlemessage {
   # howtorespond should either be 'private' or a channel
   # The prefix is raw, as received by the callback.
   my $sender = parseprefix($prefix, qq[handlemessage('$prefix', '$text', '$howtorespond')]) || '__NO_SENDER__';
+  warn("handlemessage: no sender") and return if not $sender;
   logit("parseprefix DRIBBLE: $prefix") if not $sender;
   my $fallbacktoprivate = 0;
   my $now = DateTime->now( @tz );
@@ -966,6 +972,7 @@ sub handlemessage {
     }
   } elsif ($text =~ /^!biff/) {
     logit("!biff command from $sender: $text") if $debug{biff} > 1;
+    warn "!biff: no sender means no ownernick" if not $sender;
     my @box = findrecord("popbox", "ownernick", $sender);
     my %box = map { $$_{mnemonic} => $_ } @box;
     if ($text =~ /^!biff reset/) {
@@ -1003,6 +1010,7 @@ sub handlemessage {
         } # TODO: make biffhelper support this stuff too, get rid of the grep, and simplify.
         if (grep { $_ eq uc $_ } @field) {
           # All-uppercase fields are magic.
+          warn "!biff (position 2): No sender means no ownernick" if not $sender;
           my @pbr = findrecord('popbox',
                                ownernick => $sender,
                                (($popbox =~ /^\d+$/) ? 'id' : 'mnemonic') => $popbox, );
@@ -1082,12 +1090,12 @@ sub handlemessage {
     my ($ch) = ($1);
     logit("Attempting to /join $ch at the request of $sender");
     $irc->send_srv( JOIN => $ch );
-    push @{$irc{channel}}, $ch;
+    $irc{channel}{$ch} ||= +{};
   } elsif ($text =~ /^!part ([#]+\w+(?:[-]\w+)*)/ and $irc{master}{$sender}) {
     my ($ch) = ($1);
     logit("Attempting to /part $ch at the request of $sender");
     $irc->send_srv( PART => $ch );
-    $irc{channel} = [ grep { $_ ne $ch } @{$irc{channel}}];
+    delete $irc{channel}{$ch};
   } elsif ($text =~ /^!reload/ and $irc{master}{$sender}) {
     $|=1;
     if ($text =~ /^!reload full/i) { # TODO: Test that this actually works.
@@ -1214,6 +1222,7 @@ sub friendlytz {
 
 sub biffhelper {
   my ($popbox, $msgnum, $fields, $suppresswatch, $ownernick) = @_;
+  warn "biffhelper: no ownernick" if not $ownernick;
   my @answer;
   $fields ||= $msgnum ? ['Subject'] : ['COUNT'];
   for my $field (@$fields) {
@@ -1312,6 +1321,7 @@ sub biff {
   my ($owner, $saycount) = @_;
   my $total = 0;
   logit("biff($owner, $saycount)", 4) if $debug{biff} > 2;
+  warn "biff(): no owner specified" if not $owner;
   my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
   for my $confkey (@confkey) {
     logit("Biff: checking POP3: $confkey", 2);

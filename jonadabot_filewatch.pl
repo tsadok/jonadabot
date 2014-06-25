@@ -11,6 +11,7 @@ sub watchlogfile {
   chomp $line;
   logit("watchlogfile(..., $$log{mnemonic}, ...): $line") if $debug{filewatch} > 1;
   logit("" . @watch . " watch records found", 2) if $debug{filewatch} > 2;
+  my ($whenseen, $expires, $note);
   for my $watch (@watch) {
     my ($ismatch, $followup);
     if ($$watch{isregexkey}) {
@@ -24,31 +25,72 @@ sub watchlogfile {
           # TODO: improve on this assignment:
           @matchvar{@$fieldlist} = ($1, $2, $3, $4, $5, $6, $7, $8, $9);
           chomp $line;
-          $ismatch++;
-          $followup ||= $callback ? $callback->($line, \%matchvar) : undef;
-          logit("*** Regular expression match.", 5) if $debug{filewatch} > 2;
+          if (ref $callback) {
+            my $answer = $callback->($line, %matchvar);
+            if ($answer eq 1) {
+              $ismatch++;
+              $note     ||= join ", ", @$fieldlist;
+              logit("Callback returned 1, match but no followup") if $debug{filewatch} > 4;
+            } elsif (not $answer) {
+              logit("Callback returned false, no match") if $debug{filewatch} > 4;
+            } else {
+              $ismatch++;
+              $note     ||= join ", ", @$fieldlist;
+              if ($followup) {
+                logit("Discarding extra followup line, we allow only one") if $debug{filewatch};
+              } else {
+                $followup = $answer;
+                logit("Callback returned followup line.") if $debug{filewatch} > 4;
+              }
+            }
+          } else {
+            $ismatch++;
+            $note     ||= join ", ", @$fieldlist;
+            logit("*** Regular expression match.", 5) if $debug{filewatch} > 2;
+          }
         }
       }
     } else {
-      $ismatch = (index($line, $$watch{matchstring})) ? 1 : 0;
-      my $did = $ismatch ? "Matched" : "Did NOT match";
+      $ismatch = (index($line, $$watch{matchstring}) >= 0) ? 1 : 0;
+      my $did  = $ismatch ? "Matched" : "Did NOT match";
+      $note  ||= $$watch{matchstring} . " (substring match)" if $ismatch;
       logit($did . qq[ substring, "$$watch{matchstring}"]) if $debug{filewatch} > 2;
     }
     if ($ismatch) {
-      logit("Handling logfile watch match", 3) if $debug{filewatch} > 3;
-      if ($$log{nicktomsg}) {
-        my $msg = ($$log{msgprefix} ? "$$log{msgprefix}: " : '') . $line;
-        say($msg, channel => 'private', sender => $$log{nicktomsg});
-        logit("Sent /msg to $$log{nicktomsg}") if $debug{filewatch} > 5;
+      logit("Handling logfile watch match ($$watch{id}: $$watch{matchstring})", 3) if $debug{filewatch} > 3;
+      $whenseen ||= DateTime::Format::ForDB(DateTime->now(@tz));
+      $expires  ||= DateTime::Format::ForDB(DateTime->now(@tz)->add(days => 3));
+      if ($$watch{nicktomsg}) {
+        my $msg = ($$watch{msgprefix} ? "$$watch{msgprefix}: " : '') . $line;
+        if (not findrecord('announcement', detail => $msg, context => $$watch{nicktomsg})) {
+          say($msg, channel => 'private', sender => $$watch{nicktomsg});
+          addrecord("announcement", +{ detail   => $msg,
+                                       whenseen => $whenseen,
+                                       expires  => $expires,
+                                       context  => $$watch{nicktomsg},
+                                       note     => $note,
+                                     });
+          logit("Sent /msg to $$watch{nicktomsg}") if $debug{filewatch} > 5;
+        } else {
+          logit("Already seen by $$watch{nicktomsg}") if $debug{filewatch} > 5;
+        }
       }
-      if ($$log{channel}) {
-        my $msg = ($$log{chanprefix} ? "$$log{chanprefix}: " : '') . $line;
-        say($msg, channel => $$log{channel}, sender => $irc{oper}, fallbackto => 'private');
-        # TODO: maybe add a flag to not fall back to private /msg
-        logit("Echoed to $$log{channel}") if $debug{filewatch} > 5;
-        if ($followup) {
-          say($followup, channel => $$log{channel}, sender => $irc{oper}, fallbackto => 'private');
-          logit("Following comment sent to $$log{channel}") if $debug{filewatch} > 5;
+      if ($$watch{channel}) {
+        my $msg = ($$watch{chanprefix} ? "$$watch{chanprefix}: " : '') . $line;
+        if (not findrecord('announcement', detail => $msg, context => $$watch{channel})) {
+          say($msg, channel => $$watch{channel}, sender => $irc{oper}, fallbackto => 'private');
+          # TODO: maybe add a flag to not fall back to private /msg
+          logit("Echoed to $$watch{channel}") if $debug{filewatch} > 5;
+          if ($followup) {
+            say($followup, channel => $$watch{channel}, sender => $irc{oper}, fallbackto => 'private');
+            logit("Following comment sent to $$watch{channel}") if $debug{filewatch} > 5;
+          }
+          addrecord('announcement', +{ detail   => $msg,
+                                       whenseen => $whenseen,
+                                       expires  => $expires,
+                                       context  => $$watch{channel},
+                                       note     => $note,
+                                     });
         }
       }
     }
