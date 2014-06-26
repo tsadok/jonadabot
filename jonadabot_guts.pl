@@ -4,9 +4,11 @@
 use AnyEvent::IRC::Util qw(encode_ctcp);
 
 our %demilichen; # populated later
+
 our %debug = (
               alarm      => 7,
               biff       => 1,
+              bottrigger => 1,
               connect    => 2,
               ctcp       => 1,
               echo       => 0,
@@ -140,7 +142,7 @@ sub settimer {
                                         interval => 5,
                                         cb       => sub {
                                           if (@scriptqueue) {
-                                            my ($fork, @arg) = @_;
+                                            #my ($fork, @arg) = @_;
                                             my $sqitem = shift @scriptqueue;
                                             $irc{fork}->start( cb => sub {
                                                                  doscript($sqitem);
@@ -153,7 +155,46 @@ sub settimer {
                                         interval => (60 * (getconfigvar($cfgprofile, 'alarmresminutes') || 5)),
                                         cb       => sub { checkalarms(); },
                                        );
+  $irc{timer}{smtp} = AnyEvent->timer(
+                                      after    => 60,
+                                      interval => 17, # never send more than one message every this many seconds
+                                      cb       => sub {
+                                        $irc{fork}->start( cb => sub {
+                                                             sendqueuedmail();
+                                                           });
+                                      },
+                                     );
   # additional timers could be added here for more features.
+}
+
+sub sendqueuedmail {
+  my @queue = findnull("mailqueue", 'dequeued');
+  return if not @queue;
+  my $msg = $queue[rand @queue];
+  my ($hostname) = (`/bin/hostname` =~ /(\S+)/);
+  my $server = getrecord('smtp');
+  $Mail::Sendmail::mailcfg{retries} = 7;
+  $Mail::Sendmail::mailcfg{delay}   = 113;
+  $Mail::Sendmail::mailcfg{smtp}    = [ $$server{server} ];
+  my %mail = ( From        => $$msg{fromfield} || getconfigvar($cfgprofile, 'ircemailaddress'),
+               Subject     => $$msg{subject} || 'Message from IRC ($irc{nick})',
+               Bcc         => $$msg{bcc},
+               To          => $$msg{tofield},
+              #'User-Agent' => qq[$devname $version (operated on $hostname by $irc{oper})],
+               # TODO: Date based on the enqueued datetime
+               message     => $$msg{body},
+             );
+  $$msg{trycount}++;
+  warn "No nick for message $$msg{id}" if not $$msg{nick};
+  if (sendmail(%mail)) {
+    $$msg{dequeued} = DateTime::Format::ForDB(DateTime->now(@tz));
+    say("Email message #" . $$msg{id} . " sent to $$msg{to}.",
+        channel => 'private', sender => $$msg{nick});
+  } else {
+    logit("SMTP error: $Mail::Sendmail::error");
+    say($Mail::Sendmail::error, channel => 'private', sender => $$msg{nick});
+  }
+  updaterecord('mailqueue', $msg);
 }
 
 sub checkalarms {
@@ -165,6 +206,7 @@ sub checkalarms {
     for my $alarm (@alarm) {
       my $ftime = friendlytime($now, getircuserpref($$alarm{nick}, 'timezone')|| $prefdefault{timezone});
       my $says  = ($$alarm{sender} eq $$alarm{nick}) ? '' : qq[$$alarm{sender} says];
+      warn "No nick for alarm $$alarm{id}" if not $$alarm{nick};
       say("It's ${ftime}: [$$alarm{id}] $says$$alarm{message}", sender => $$alarm{nick}, channel => 'private');
       # TODO: if the user's not ON at the moment, enqueue a !tell instead
       $$alarm{viewcount}++;
@@ -544,6 +586,7 @@ sub handlemessage {
   }
   my $oldpingtime = $irc{pingtime};
   updatepingtimes($sender, $howtorespond, $text);
+  my (@rec); # assigned in one of the conditionals below.
   if ($text =~ /^!tea\s*(black|green|herbal|white|oolang)*\s*(\w*)/) {
     my ($type, $namedrecipient) = ($1, $2);
     my $recipient = $sender; # Back to the user by default.
@@ -634,7 +677,7 @@ sub handlemessage {
     }
   } elsif ($text =~ /^!ping\s*?( ?\w{0,20})/) {
     my ($userdata) = ($1);
-    my ($extradata) = ($irc{master}{$sender} ? (qq[ pt=] . $irc{pingtime}->hms()) : '');
+    my ($extradata) = ($irc{master}{$sender} ? (qq[ $$ pt=] . $irc{pingtime}->hms()) : '');
     say("!pong$extradata $userdata", channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
   } elsif ($text =~ /^!vlads?bane/) {
     # TODO: generalize this sort of thing (probably also !tea, etc.) by listing valid
@@ -905,70 +948,91 @@ sub handlemessage {
     }
   } elsif ($text =~ /^!debug (.*)/ and $irc{master}{$sender}) {
     say(debuginfo($1), channel => 'private', sender => $sender );
+  } elsif ($text =~ /^!email\s+(\w+)\s*(\S.*?)\s*[:]\s*(.+)/) {
+    my ($mnemonic, $subject, $restofmessage) = ($1, $2, $3);
+    my $contact = findrecord("emailcontact", "ircnick", $sender, "mnemonic", $mnemonic);
+    if ($contact) {
+      my $body = $subject . $restofmessage . ($$contact{signature} || "\n --$sender\n");
+      my $from = getconfigvar($cfgprofile, 'operatoremailaddress'); # TODO: allow the operator to establish different from fields for different users.
+      my $dest = getrecord("emaildest", $$contact{emaildest});
+      my $result = addrecord("mailqueue", +{ tofield   => $$dest{address},
+                                             fromfield => $from,
+                                             nick      => $sender,
+                                             subject   => $subject,
+                                             body      => $body,
+                                             bcc       => $$dest{bcc},
+                                             enqueued  => DateTime::Format::ForDB(DateTime->now(@tz)),
+                                           });
+      if ($result) {
+        say("Message enqueued (" . $db::added_record_id . ")", channel => 'private', sender => $sender);
+      } else {
+        logit("Failed to enqueue email message ($text)");
+        say("Failed to enqueue your message, sorry.", channel => 'private', sender => $sender);
+      }
+    } else {
+      say("Email contact not found: $mnemonic (for $sender)", channel => 'private', sender => $sender);
+    }
   } elsif ($text =~ /^!sms (\w+) (.*)/) {
     my ($target, $msg) = ($1, $2);
-    my $targ = lc $target;
-    if ($sms{$targ}) {
-      if ((grep { $_ eq $sender } @{$sms{$targ}{contact}}) or ($irc{master}{$sender})) {
-        my $phnum = $sms{$targ}{phnumber}; if ($phnum) {
-          my $carrier = $sms{__CARRIER__}{$sms{$targ}{carrier}};
-          if ((ref $carrier) and ref $$carrier{gateway}) {
-            # TODO: support multiple gateways in some fashion.
-            my $gateway = $$carrier{gateway}[0];
-            my $address = $phnum . '@' . $gateway;
-            my $smtp    = $sms{$targ}{smtp};
-            if ($smtp{$smtp}) {
-              my $from = $smtp{$smtp}{from}; if ($from) {
-                my $server = $smtp{$smtp}{server}; if ($server) {
-                  my $subject;
-                  if ($msg =~ /^(.*?)[[](.*?)[]](.*)$/) {
-                    my ($pre, $subj, $post) = @_;
-                    $subject = join ' ', map { ucfirst lc $_ } split /\s+/, $subj;
-                  } else {
-                    $subject = $msg;
-                  }
-                  my $result = sendmail(+{ To         => $address,
-                                           From       => $from,
-                                           Message    => $msg,
-                                           Bcc        => $smtp{$smtp}{bcc}, # this is allowed to be undef
-                                           Subject    => $subject,
-                                           'X-Mailer' => qq[$devname v$version, by $author; using Mail::Sendmail],
-                                           Smtp       => $server,
-                                         });
-                  if ($result) {
-                    say("Mail appears to have been sent Ok (to $address).",
-                        channel => 'private', sender => $sender );
-                  } else {
-                    say("Sending mail to $address seems to have failed.",
-                        channel => 'private', sender => $sender );
-                  }
+    my $mrec = findrecord("smsmnemonic", ircnick => $sender, mnemonic => $target);
+    if (ref $mrec) {
+      my $dest = getrecord("smsdestination", $$mrec{destination});
+      if ($dest) {
+        my $carrier = getrecord("smscarrier", $$dest{carrier});
+        if ($carrier) {
+          my $gateway = findrecord("smscarriergate", "carrier", $$carrier{id}); # TODO: support multiple gateways per carrier in a reasonable way
+          if ($gateway) {
+            my $address = $$dest{phnumber} . '@' . $$gateway{domain};
+            my $smtp    = getrecord('smtp'); # TODO: support multiple smtp servers in some way.
+            if (ref $smtp) {
+              my $from = getconfigvar($cfgprofile, 'ircemailaddress'); # TODO: allow the operator to set up per-user from fields, with this being just the default
+              if ($from) {
+                my $subject;
+                if ($msg =~ /^(.*?)[[](.*?)[]](.*)$/) {
+                  my ($pre, $subj, $post) = @_;
+                  $subject = join ' ', map { ucfirst lc $_ } split /\s+/, $subj;
                 } else {
-                  say("Don't know what actual SMTP server to use for '$smtp', sorry.",
+                  $subject = $msg;
+                }
+                my $result = addrecord("mailqueue", +{
+                                                      tofield    => $address,
+                                                      fromfield  => $from,
+                                                      body       => $msg,
+                                                      nick       => $sender,
+                                                      bcc        => $$smtp{bcc}, # this is allowed to be undef
+                                                      subject    => $subject,
+                                                      enqueued   => DateTime::Format::ForDB(DateTime->now(@tz)),
+                                                     });
+                if ($result) {
+                  say("Enqueued mail #" . $db::added_record_id . " to $address",
+                      channel => 'private', sender => $sender );
+                } else {
+                  say("Enqueing mail to $address seems to have failed.",
                       channel => 'private', sender => $sender );
                 }
               } else {
-                say("Don't know what from field to use for SMTP server '$smtp', sorry.",
+                say("No from field; $irc{oper} needs to configure ircemailaddress.",
                     channel => 'private', sender => $sender );
               }
-            } elsif ($smtp) {
-              say("No smtp server details for '$smtp', sorry.",
-                  channel => 'private', sender => $sender );
             } else {
-              say("No smtp server listed for $target, sorry.",
-                channel => 'private', sender => $sender );
+              say("No smtp server; $irc{oper} needs to configure one.",
+                  channel => 'private', sender => $sender );
             }
           } else {
-            say("No carrier gateway on file for '$sms{$targ}{carrier}', sorry.",
+            say("No email-to-SMS gateway configured for cellular carrier $$carrier{id}.", # TODO: better field
                 channel => 'private', sender => $sender );
           }
         } else {
-          say("No cellphone number on file for $target, sorry.",
+          say("Could not find cellular carrier number $$dest{carrier} in my database.",
               channel => 'private', sender => $sender );
         }
       } else {
-        say("No SMS info on file for $target, sorry.",
+        say("No cellphone number on file for $$mrec{mnemonic}, sorry.",
             channel => 'private', sender => $sender );
       }
+    } else {
+      say("No SMS contact info on file for $target, sorry.",
+          channel => 'private', sender => $sender );
     }
   } elsif ($text =~ /^!biff/) {
     logit("!biff command from $sender: $text") if $debug{biff} > 1;
@@ -1003,7 +1067,7 @@ sub handlemessage {
         my (@field) = split /\s+/, $therest;
         push @field, 'Subject' if not @field;
         for my $field (grep { $_ ne uc $_ } @field) { # mixed-case fields are header fields
-          for my $msg (biffhelper($popbox, $msgnum, [$field], 'suppresswatch', $sender)) {
+          for my $msg (biffhelper($popbox, $msgnum, [$field], 'suppresswatch', $sender, 'handlemessage (box-specific)')) {
             say($msg, channel => 'private', sender => $sender);
             select undef,undef,undef,0.2;
           }
@@ -1054,7 +1118,7 @@ sub handlemessage {
         }
       } else {
         my $count   = biffhelper($popbox, undef, ['COUNT']);
-        say("$count messages waiting in $popbox", channel => 'private', sender => $sender);
+        say("$count messages waiting in $popbox", channel => 'private', sender => $sender, 'handlemessage (getting count)');
       }
     } elsif ($irc{master}{$sender}) {
       # TODO: audit biff() to ensure they can only get their own mail,
@@ -1116,6 +1180,39 @@ sub handlemessage {
       } @{$irc{demi}};
       do $watchrod;
       logit("Reload complete.", 1);
+    }
+  } elsif ($text =~ /^!(\w+)/ and (@rec = findrecord("bottrigger", "bottrigger", $1, "enabled", 1))) {
+    logit("Can't Happen: no bottrigger record for $text") if not @rec;
+    for my $t (@rec) {
+      if ((not $$t{channel}) or (index($$t{channel}, $howtorespond) > 0) or ($howtorespond eq 'private')) {
+        if (($irc{okdom}{$howtorespond}) or (not ($$t{flags} =~ /C/))
+            or ($howtorespond eq 'private')) { # C means respond in channel even if not okdom
+          if ($irc{master}{$sender} or not $$t{flags} =~ /M/) { # M means master-only bottrigger
+            if ($$t{flags} =~ /R/) { # R means Routine bottrigger, as opposed to flat text
+              if ($routine{$$t{answer}}) {
+                my $response = $routine{$$t{answer}}->($$t{bottrigger}, channel => $howtorespond, text => $text);
+                # TODO: pass more args there to allow routines more flexibility in what they can do.
+                if ($response) {
+                  say($response, channel => $howtorespond, sender => $sender, fallbackto => 'private')
+                } else {
+                  logit("No response from routine $$t{answer} for bottrigger $$t{bottrigger}"); # always log this; it's an error
+                }
+              } else {
+                logit("Did not find routine $$t{answer} for bottrigger $$t{bottrigger}"); # always log this; it's an error
+              }
+            } else {
+              # Flat, non-routine bottrigger
+              say($$t{answer}, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            }
+          } else {
+            logit("Not responding to master-only custom bottrigger in channel $howtorespond for sender $sender") if $debug{bottrigger};
+          }
+        } else {
+          logit("Not responding to custom bottrigger $$t{bottrigger} in non-okdom channel $howtorespond") if $debug{bottrigger};
+        }
+      } else {
+        logit("Not responding to custom bottrigger $$t{bottrigger} in non-included channel $howtorespond") if $debug{bottrigger};
+      }
     }
   } elsif ($irc{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots:
     my $fallback = shift @{$irc{echo}{$sender}{$howtorespond}{fallback}};
@@ -1221,8 +1318,8 @@ sub friendlytz {
 }
 
 sub biffhelper {
-  my ($popbox, $msgnum, $fields, $suppresswatch, $ownernick) = @_;
-  warn "biffhelper: no ownernick" if not $ownernick;
+  my ($popbox, $msgnum, $fields, $suppresswatch, $ownernick, $caller) = @_;
+  warn "biffhelper: no ownernick (from $caller)" if not $ownernick;
   my @answer;
   $fields ||= $msgnum ? ['Subject'] : ['COUNT'];
   for my $field (@$fields) {
@@ -1321,11 +1418,13 @@ sub biff {
   my ($owner, $saycount) = @_;
   my $total = 0;
   logit("biff($owner, $saycount)", 4) if $debug{biff} > 2;
-  warn "biff(): no owner specified" if not $owner;
+  warn "biff(): no owner specified, defaulting to $irc{oper}" if not $owner;
+  $owner ||= $irc{oper};
+  warn "biff(): no owner/operator" and return if not $owner;
   my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
   for my $confkey (@confkey) {
     logit("Biff: checking POP3: $confkey", 2);
-    my $count = biffhelper($confkey);
+    my $count = biffhelper($confkey, undef, undef, undef, $owner, 'biff');
     logit("Count for $confkey: $count") if $debug{biff} > 3;
     $total += $count;
     logit("Biff Count: $count ($confkey)") if $debug{pop3} > 1;
@@ -1494,3 +1593,5 @@ sub setalarm {
     say("Failed to set alarm", %arg);
   }
 }
+
+42;

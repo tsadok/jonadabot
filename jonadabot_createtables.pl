@@ -91,6 +91,16 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS recurringalarm(
      flags       tinytext)");
 $q->execute();
 
+# Custom Triggers:
+
+$q = $db->prepare("CREATE TABLE IF NOT EXISTS bottrigger (
+     id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     bottrigger    tinytext,
+     answer        tinytext,
+     enabled       integer,
+     flags         tinytext)");
+$q->execute();
+
 ###################################################################
 # Tables related to email and SMS features:                       #
 ###################################################################
@@ -162,6 +172,38 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS smtp (
      server        tinytext,
      bcc           tinytext,
      flags         tinytext)");
+$q->execute();
+
+# Standard email destinations:
+$q = $db->prepare("CREATE TABLE IF NOT EXISTS emaildest (
+     id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     address       tinytext,
+     bcc           tinytext,
+     flags         tinytext)");
+$q->execute();
+
+# Individual users' email contacts:
+$q = $db->prepare("CREATE TABLE IF NOT EXISTS emailcontact (
+     id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     mnemonic      tinytext,
+     ircnick       tinytext,
+     emaildest     integer,
+     signature     tinytext,
+     flags         tinytext)");
+$q->execute();
+
+# Outgoing Mail Queue:
+$q = $db->prepare("CREATE TABLE IF NOT EXISTS mailqueue (
+     id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     tofield       tinytext,
+     fromfield     tinytext,
+     nick          tinytext,
+     subject       tinytext,
+     bcc           tinytext,
+     enqueued      datetime,
+     trycount      integer,
+     dequeued      datetime,
+     body          text)");
 $q->execute();
 
 ###################################################################

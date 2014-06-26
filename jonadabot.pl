@@ -185,7 +185,7 @@ $irc->reg_cb (connect => sub {
                     $irc->send_srv( NICK => $nick, );
                       select undef, undef, undef, 0.1;
                   }
-                  $irc->send_srv( PRIVMSG => $_, "I'm in.", )
+                  $irc->send_srv( PRIVMSG => $_, "I'm in ($$).", )
                     for uniq(getconfigvar($cfgprofile, "defaultoperator"),
                              getconfigvar($cfgprofile, "operator"));
                   select undef, undef, undef, 0.1;
@@ -197,8 +197,8 @@ $irc->reg_cb (connect => sub {
                 }
               });
 warn "Stage " . (shift @stage) . " (connected to IRC)";
-$irc->reg_cb (registered => sub { logandprint("I'm in!\n"); });
-$irc->reg_cb (disconnect => sub { logandprint("I'm out!\n");
+$irc->reg_cb (registered => sub { logandprint("I'm in ($$)!\n"); });
+$irc->reg_cb (disconnect => sub { logandprint("I'm out ($$)!\n");
                                   $condvar->broadcast; exit 1; });
 
 $irc->reg_cb (channel_add => sub { my ($client, $msg, $channel, @nick) = @_;

@@ -63,6 +63,7 @@ sub watchlogfile {
       if ($$watch{nicktomsg}) {
         my $msg = ($$watch{msgprefix} ? "$$watch{msgprefix}: " : '') . $line;
         if (not findrecord('announcement', detail => $msg, context => $$watch{nicktomsg})) {
+          warn "No nick to msg" if not $$watch{nicktomsg};
           say($msg, channel => 'private', sender => $$watch{nicktomsg});
           addrecord("announcement", +{ detail   => $msg,
                                        whenseen => $whenseen,
