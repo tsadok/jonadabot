@@ -5,7 +5,7 @@ use AnyEvent::IRC::Util qw(encode_ctcp);
 
 our %demilichen; # populated later
 
-our %debug = (
+our %debug = ( # TODO: override these defaults from the DB, after the DB code is loaded.
               alarm      => 7,
               biff       => 1,
               bottrigger => 1,
@@ -16,8 +16,9 @@ our %debug = (
               groupnick  => 0,
               irc        => 0,
               login      => 0,
-              pingtime   => 3,
+              pingtime   => 1,
               pop3       => 1,
+              preference => 3,
               privatemsg => 0,
               publicmsg  => 0,
               say        => 0,
@@ -26,9 +27,9 @@ our %debug = (
             );
 
 
-our %prefdefault = (
-                    timezone => 'UTC',
-                   );
+%prefdefault = (
+                timezone => 'UTC',
+               );
 
 my $defaultusername = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
 my $ourclan = getconfigvar($cfgprofile, 'clan') || 'demilichens'; # used more than one place below.
@@ -390,10 +391,11 @@ sub say {
 sub getircuserpref {
   my ($user, $var) = @_;
   if ($user) {
-    my $r = grep { $$_{prefname} eq $var } findrecord('userpref', 'username', $user);
+    my $r = findrecord('userpref', 'username', $user, 'prefname', $var);
     if (ref $r) {
       return $$r{value};
     } else {
+      logit("Did not find preference $var for $user, using default, $prefdefault{$value}");
       return $prefdefault{$value};
     }
   } else {
@@ -409,8 +411,10 @@ sub setircuserpref {
     logit("Too many values of pref $var for user $user") if 1 < scalar @r;
     $$r{value} = $value;
     updaterecord('userpref', $r);
+    logit("Changing userpref $var to $value for $user") if $debug{preference} > 1;
   } else {
     addrecord('userpref', +{ username => $user, prefname => $var, value => $value });
+    logit("Creating $var preference for $user") if $debug{preference};
   }
   my $newval = getircuserpref($user, $var);
   if ($newval eq $value) {
@@ -664,7 +668,7 @@ sub handlemessage {
     #       That's still not good, of course:  we shouldn't be proxying for a bot that
     #       frequents the same channel we're in; if we are it means we're misconfigured.
     #       But only using /msg to get the response should at least avoid loops.
-    my ($command, $args) = @_;
+    my ($command, $args) = ($1, $2);
     say($text, channel => 'private', sender => 'Rodney'); {
       # This isn't perfect.  In the event of lag, when multiple destination channels are
       # involved, responses to multiple proxied commands can end up all being echoed to
@@ -765,13 +769,20 @@ sub handlemessage {
       say($item,
           channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
-  } elsif ($text =~ /^!set\s*(\w+)\s*(.*)/) {
+  } elsif ($text =~ /^!showpref\s*(\w+)/) {
+    my ($var) = ($1);
+    my $value = getircuserpref($sender, $var);
+    say("$var == $value", channel => 'private', sender => $sender);
+  } elsif ($text =~ /^!set\s*(\w+)\s+(.*)/) {
     # TODO: add a list of valid pref variable names to the database and support setting values for any pref listed there.
     #       but note that for security reasons timezone needs to remain special-cased.
     # TODO: support /listing/ your own set prefs (by /msg only, not in channel).
-    my ($var, $value) = @_;
+    my ($var, $value) = ($1, $2);
+    chomp $value; # Not sure if this is necessary.
+    logit("$sender wants to set $var preference to $value") if $debug{preference};
     if ($var eq 'timezone') {
       my ($tz) = $value =~ m!(\w+(?:[/]\w+)*)!;
+      logit("potential timezone value: $tz") if $debug{preference} > 1;
       my ($tzname) = grep { $_ eq $tz } DateTime::TimeZone->all_names();
       $tzname ||= $prefdefault{timezone};
       setircuserpref($sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
@@ -841,24 +852,38 @@ sub handlemessage {
     # TODO: document this feature in !help
     if ($text =~ m~^!alarm set (.+)~i) {
       my ($setparams) = ($1);
+      logit("Alarm: $sender wants to set $setparams") if $debug{alarm};
       if ($setparams =~ m~(today|tomorrow|Sun|Mon|Tue|Wed|Thu|Fri|Sat|(?:\d*[-]?\s*(?:the|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*\d+(?:st|nd|rd)?))\s*(?:at)?\s*(\d+[:]?\d*[:]?\d*\s*(?:am|pm)?)\s*(.*)~i) {
         my ($datepart, $timepart, $message) = ($1, $2, $3);
-        my $thedate = DateTime->now(@tz);
+        if ($debug{alarm} > 3) {
+          logit("datepart: $datepart", 3);
+          logit("timepart: $timepart", 3);
+          logit("message:  $message",  3);
+        }
+        my $tz = (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
+        logit("timezone: $tz") if ($debug{timezone} + $debug{alarm} > 4);
+        my $thedate = DateTime->now( time_zone => $tz);
+        logit("default date: " . $thedate->ymd(), 2) if $debug{alarm} > 6;
         if ($datepart =~ /tomorrow/) {
           $thedate = $thedate->add( days => 1 );
-        } elsif ($thedate =~ /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)/i) {
+          logit("tomorrow: " . $thedate->ymd(), 2) if $debug{alarm} > 3;
+        } elsif ($datepart =~ /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)/i) {
           my $dow = $1;
           while ($thedate->day_abbr ne ucfirst lc $dow) {
             $thedate = $thedate->add( days => 1 );
           }
-        } elsif ($thedate =~ /(\d*)[-]?\s*(The|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*(\d+)(?:st|nd|rd)?/i) {
+          logit("Day of Week ($dow): " . $thedate->day_abbr() . " " . $thedate->ymd(), 2) if $debug{alarm} > 3;
+        } elsif ($datepart =~ /(\d*)[-]?\s*(The|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)?(?:[a-z]*)\s*(\d+)(?:st|nd|rd)?/i) {
           my ($yr, $mo, $md) = ($1, $2, $3);
+          logit("yr $yr, mo $mo, md $md", 3) if $debug{alarm} > 3;
           $yr ||= $thedate->year();
           my %monum = ( Jan => 1,  Feb => 2, Mar => 3, Apr =>  4, May =>  5, Jun =>  6,
                         Jul => 7,  Aug => 8, Sep => 9, Oct => 10, Nov => 11, Dec => 12, );
-          my $month = $monum{$mo} || $thedate->month();
-          $thedate = DateTime->new( year => $yr, month => $month, day => $md, @tz);
+          my $month = $monum{ucfirst lc $mo} || $thedate->month();
+          logit("yr $yr, month $month, md $md", 4) if $debug{alarm} > 3;
+          $thedate = DateTime->new( year => $yr, month => $month, day => $md, time_zone => $tz);
         }
+        logit("thedate: " . $thedate->ymd(), 3) if $debug{alarm} > 3;
         $timepart =~ m~(\d+)[:]?(\d*)[:]?(\d*)\s*(am|pm|)~i;
         my ($hr, $mn, $sc, $ampm) = ($1, $2, $3, $4);
         if ($ampm eq 'pm') {
@@ -866,9 +891,11 @@ sub handlemessage {
         } elsif ($ampm eq 'am') {
           $hr = $hr % 12;
         }
+        logit("hr $hr, mn $mn, sc $sc", 3) if $debug{alarm} > 4;
         my $dt = DateTime->new( year => $thedate->year(), month => $thedate->month(), day => $thedate->mday(),
-                                hour => $hr, minute => ($mn || 0), second => ($sc || 0), @tz);
-        $alarm ||= "It's " . friendlytime($dt) . "!";
+                                hour => $hr, minute => ($mn || 0), second => ($sc || 0), time_zone => $tz);
+        logit("dt " . $dt->ymd() . " at " . $dt->hms(), 3) if $debug{alarm} > 2;
+        $message ||= "It's " . friendlytime($dt) . "!";
         setalarm($dt, $message, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } else {
         say("Sorry, I did not understand that date and time.", channel => 'private', sender => $sender);
@@ -884,7 +911,7 @@ sub handlemessage {
         say("Not your alarm: $num", channel => 'private', sender => $sender);
       } else {
         my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
-                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone});
+                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
         say("Alarm $$alarm{id} viewed " . ($$alarm{viewcount} || 0) . " time(s), "
             . ($$alarm{status} ? 'inactive' : "set to go off $forwhen") . ".",
             channel => 'private', sender => $sender);
@@ -911,7 +938,7 @@ sub handlemessage {
       } elsif (1 == scalar @alarm) {
         my $alarm = $alarm[0];
         my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
-                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone});
+                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
         say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
       } else {
         say("" . @alarm . " alarms: " . (join ", ", map { $$_{id} } @alarm),
@@ -989,7 +1016,7 @@ sub handlemessage {
               if ($from) {
                 my $subject;
                 if ($msg =~ /^(.*?)[[](.*?)[]](.*)$/) {
-                  my ($pre, $subj, $post) = @_;
+                  my ($pre, $subj, $post) = ($1, $2, $3);
                   $subject = join ' ', map { ucfirst lc $_ } split /\s+/, $subj;
                 } else {
                   $subject = $msg;
@@ -1257,7 +1284,7 @@ sub viewmessage {
   my $r = getrecord('memorandum', $arg{number});
   if ($$r{target} eq $arg{sender}) {
     my $dt = DateTime::Format::FromDB($$r{thedate});
-    my $date = friendlytime($dt, getircuserpref($$r{target}, 'timezone') || $prefdefault{timezone});
+    my $date = friendlytime($dt, getircuserpref($$r{target}, 'timezone') || $prefdefault{timezone} || $servertz);
     say(qq[$sender: $$r{sender} says, $$r{message} (in $$r{channel}, $date)], %arg);
     $$r{status} = 2;
     $$r{statusdate} = DateTime::Format::ForDB(DateTime->now(@tz));
@@ -1292,7 +1319,7 @@ sub ampmtime {
 sub friendlytime { # TODO: make some parts of this customizable via userpref, beyond just the timezone.
   my ($whendt, $displaytz, $style) = @_;
   my $when = $whendt->clone();
-  $displaytz ||= $prefdefault{timezone};
+  $displaytz ||= $prefdefault{timezone} || $servertz;
   $when->set_time_zone($displaytz);
   my $now = DateTime->now( @tz )->set_time_zone($displaytz);
   if ($style eq 'announce') {
@@ -1587,7 +1614,7 @@ sub setalarm {
   my $result = addrecord("alarm", $alarm);
   my $id = $db::added_record_db;
   if ($result) {
-    say("Alarm set for " . (friendlytime($dt), getircuserpref($arg{nick}, 'timezone') || $prefdefault{timezone})
+    say("Alarm set for " . (friendlytime($dt), getircuserpref($arg{nick}, 'timezone') || $prefdefault{timezone} || $servertz)
         . " ($id)", %arg);
   } else {
     say("Failed to set alarm", %arg);

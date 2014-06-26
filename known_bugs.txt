@@ -1,5 +1,4 @@
 Known bugs:
- * Setting alarms does not correctly handle a user's timezone preference.
  * Logfile watching is broken since the 005 => 006 transition.
 
 Features Wanted:
