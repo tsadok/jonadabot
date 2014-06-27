@@ -1,5 +1,5 @@
 Known bugs:
- * Logfile watching is broken since the 005 => 006 transition.
+ * 
 
 Features Wanted:
  * TODO-list management:

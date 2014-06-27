@@ -1,0 +1,135 @@
+
+body {
+  background-color:  #333333;
+  color:             #999999;
+}
+
+div.p, div.h {
+  background-color:  #666666;
+  color:             #EEEEEE;
+}
+div.h {
+  font-size:         125%;
+  margin:            0.8em;
+  padding:           0.8em;
+  border-top-left-radius:    1em;
+  border-top-right-radius:   1em;
+  border-bottom:     2px dashed #AAAAAA;
+}
+div.p {
+  margin:            1em;
+  padding:           1em;
+  border-radius:     0.5em;
+}
+div.h + div.p {
+  margin-top:        -1em;
+  border-top-left-radius:    0px;
+  border-top-right-radius:   0px;
+}
+
+.trigger {
+  color:             #FFFF33;
+}
+.triggerargs {
+  color:             #33AAFF;
+}
+
+table th,
+table td {
+  text-align:        left;
+  background-color:  #000000;
+  border:            1px solid #666666;
+}
+table th {
+  color:             #EEEEEE;
+}
+table td {
+  color:             #CCCCCC;
+}
+
+table#trophycase th {
+  padding:           1em;
+}
+table#trophycase td {
+  padding-bottom:    1em;
+}
+
+.error {
+  background-color:  #7F0000;
+  color:             #FFFF00;
+}
+.ourclan,
+.ourclan1 {
+  font-weight:       bold;
+  color:             #00FF00;
+}
+.firstplace,
+.firstplace1,
+.firstplace2 {
+  font-weight:       bold;
+  color:             #FF00FF;
+}
+.ahead,
+.ahead1 {
+  color:             #FF4400;
+}
+.ahead2 {
+  color:             #FF7F00;
+}
+.ahead3 {
+  color:             #FF9900;
+}
+.ahead4 {
+  color:             #FFAA00;
+}
+.behind,
+.behind1 {
+  color:             #FFFF00;
+}
+.behind2 {
+  color:             #EEFF55;
+}
+.behind3 {
+  color:             #EEFF99;
+}
+.behind4 {
+  color:             #EEFFAA;
+}
+.nothreat,
+.nothreat1 {
+  color:             #00FFFF;
+}
+.nothreat2 {
+  color:             #11CCFF;
+}
+.nothreat3 {
+  color:             #22AAFF;
+}
+.nothreat4 {
+  color:             #3399FF;
+}
+.nothreat5 {
+  color:             #4488FF;
+}
+.nothreat6 {
+  color:             #5577FF;
+}
+.nothreat7 {
+  color:             #6666FF;
+}
+
+a {
+  color:             #FFFFFF;
+}
+
+div.clanexclusive {
+  margin:            1.5em;
+  padding:           0.5em;
+  border:            1pt dotted #EEEEEE;
+  border-radius:     0.75em;
+  background-color:  #444444;
+  color:             #CCCCCC;
+}
+span.excldeath {
+  display:           inline-block;
+}

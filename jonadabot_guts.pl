@@ -165,7 +165,42 @@ sub settimer {
                                                            });
                                       },
                                      );
+  $irc{timer}{sibling} = AnyEvent->timer( after    => 60,
+                                          interval => (60 * (getconfigvar($cfgprofile, 'siblingminutes') || 3)),
+                                          cb       => sub {
+                                            $irc{fork}->start( cb => sub {
+                                                                 checksiblings();
+                                                               });
+                                          },
+                                        );
   # additional timers could be added here for more features.
+}
+
+sub checksiblings {
+  logit("Checking on siblings") if $debug{siblings};
+  my @sibling = getconfigvar($cfgprofile, 'sibling');
+  return if not @sibling;
+  my $mins   = getconfigvar($cfgprofile, 'siblingminutes') || 3;
+  my $now    = DateTime->now(@tz);
+  my $once   = DateTime::Format::ForDB($now->clone()->subtract( minutes => $mins ));
+  my $twice  = DateTime::Format::ForDB($now->clone()->subtract( minutes => (2 * $mins)));
+  my $thrice = DateTime::Format::ForDB($now->clone()->subtract( minutes => (3 * $mins)));
+  for my $sib (@sibling) {
+    # TODO: support nick aliases
+    logit("Checking on $sib", 3) if $debug{siblings} > 3;
+    my ($seen) = findrecord('seen', 'nick', $sib);
+    if ($$seen{whenseen} lt $thrice) {
+      logit("Thrice: haven't seen $sib since $$seen{whenseen}, pinging operator");
+      say("Hey, $irc{oper}, I haven't heard from $sib since $$seen{whenseen}.",
+          channel => 'private', sender => $irc{oper});
+    } elsif ($$seen{whenseen} lt $twice) {
+      logit("Twice: haven't seen $sib since $$seen{whenseen}");
+      say("!ping", channel => 'private', sender => $sib);
+    } elsif ($$seen{whenseen} lt $once) {
+      logit("Once: pinging $sib");
+      say("!ping", channel => 'private', sender => $sib);
+    }
+  }
 }
 
 sub sendqueuedmail {
@@ -389,6 +424,7 @@ sub say {
 }
 
 sub getircuserpref {
+  # TODO: support nick aliases with an elsif to the canonical one's pref
   my ($user, $var) = @_;
   if ($user) {
     my $r = findrecord('userpref', 'username', $user, 'prefname', $var);
@@ -769,11 +805,11 @@ sub handlemessage {
       say($item,
           channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
-  } elsif ($text =~ /^!showpref\s*(\w+)/) {
+  } elsif ($text =~ /^!show(?:pref)?\s*(\w+)/) {
     my ($var) = ($1);
     my $value = getircuserpref($sender, $var);
     say("$var == $value", channel => 'private', sender => $sender);
-  } elsif ($text =~ /^!set\s*(\w+)\s+(.*)/) {
+  } elsif ($text =~ /^!set(?:pref)?\s*(\w+)\s+(.*)/) {
     # TODO: add a list of valid pref variable names to the database and support setting values for any pref listed there.
     #       but note that for security reasons timezone needs to remain special-cased.
     # TODO: support /listing/ your own set prefs (by /msg only, not in channel).
@@ -842,7 +878,7 @@ sub handlemessage {
     # TODO:  allow the user to specify a timezone (but be careful about security issues).
     my $date = friendlytime(DateTime->now(@tz), getircuserpref($sender, 'timezone'), 'announce');
     say ($date, channel => $howtorespond, sender => $sender, fallbackto => 'private');
-  } elsif ($text =~ /^!rot13/i) {
+  } elsif ($text =~ /^!(?:rot13|ebg13)/i) {
     my ($blah) = $text =~ /^!rot13\s*(.*)/i;
     $blah =~ tr/A-Za-z/N-ZA-Mn-za-m/;
     say("!ebg13 $blah", channel => $howtorespond, sender => $sender, fallbackto => 'private');
@@ -935,11 +971,12 @@ sub handlemessage {
       if (0 >= scalar @alarm) {
         say("You currently have no " . (@extraarg ? "(@extraarg) " : '') . "alarms set.",
             channel => 'private', sender => $sender);
-      } elsif (1 == scalar @alarm) {
-        my $alarm = $alarm[0];
-        my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
-                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
-        say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
+      } elsif (getconfigvar($cfgprofile, 'maxlines') >= scalar @alarm) {
+        for my $alarm (@alarm) {
+          my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
+                                     getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
+          say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
+        }
       } else {
         say("" . @alarm . " alarms: " . (join ", ", map { $$_{id} } @alarm),
             channel => 'private', sender => $sender);
@@ -961,7 +998,13 @@ sub handlemessage {
                "You are in a debris room filled with stuff washed in from the surface.",);
     say($msg[int rand @msg], channel => $howtorespond, sender => $sender );
   } elsif ($text =~ /^!help\s*(.*)/) {
-    say(helpinfo($1), channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    my ($topic) = $1;
+    if ($topic) {
+      say(helpinfo($1), channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    } else {
+      my $info = getconfigvar($cfgprofile, 'helpurl') || helpinfo();
+      say($info, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    }
   } elsif ($text =~ /^!say\s*to\s*(\S+)\s*(.+)/) {
     my ($target, $thing) = ($1, $2);
     if ($irc{master}{$sender}) {
@@ -977,7 +1020,7 @@ sub handlemessage {
     say(debuginfo($1), channel => 'private', sender => $sender );
   } elsif ($text =~ /^!email\s+(\w+)\s*(\S.*?)\s*[:]\s*(.+)/) {
     my ($mnemonic, $subject, $restofmessage) = ($1, $2, $3);
-    my $contact = findrecord("emailcontact", "ircnick", $sender, "mnemonic", $mnemonic);
+    my $contact = findrecord("emailcontact", "ircnick", $sender, "mnemonic", $mnemonic); # TODO: support nick aliases.
     if ($contact) {
       my $body = $subject . $restofmessage . ($$contact{signature} || "\n --$sender\n");
       my $from = getconfigvar($cfgprofile, 'operatoremailaddress'); # TODO: allow the operator to establish different from fields for different users.
@@ -1001,7 +1044,7 @@ sub handlemessage {
     }
   } elsif ($text =~ /^!sms (\w+) (.*)/) {
     my ($target, $msg) = ($1, $2);
-    my $mrec = findrecord("smsmnemonic", ircnick => $sender, mnemonic => $target);
+    my $mrec = findrecord("smsmnemonic", ircnick => $sender, mnemonic => $target); # TODO: support nick aliases.
     if (ref $mrec) {
       my $dest = getrecord("smsdestination", $$mrec{destination});
       if ($dest) {
@@ -1061,7 +1104,7 @@ sub handlemessage {
       say("No SMS contact info on file for $target, sorry.",
           channel => 'private', sender => $sender );
     }
-  } elsif ($text =~ /^!biff/) {
+  } elsif ($text =~ /^!biff/) { # TODO: support nick aliases
     logit("!biff command from $sender: $text") if $debug{biff} > 1;
     warn "!biff: no sender means no ownernick" if not $sender;
     my @box = findrecord("popbox", "ownernick", $sender);
@@ -1249,6 +1292,7 @@ sub handlemessage {
   }
   # Finally, check to see if we have any memoranda for the person who just spoke:
   my @msg = grep { not $$_{status} } findrecord('memorandum', 'target', $sender);
+  # TODO: support nick aliases
   if (scalar @msg) {
     if (2 < scalar @msg) {
       my $nums = commalist(map { $$_{id} } @msg);
@@ -1270,7 +1314,7 @@ sub handlemessage {
 sub haveseenlately {
   my ($nick) = @_;
   # Check to see if we've seen that user "lately".
-  my ($latelynum, $latelyunit) = ("" . getconfigvar($cfgprofile, 'lately') || "72 hours")
+  my ($latelynum, $latelyunit) = (("" . getconfigvar($cfgprofile, 'lately')) || "72 hours")
     =~ /([0-9.]+)\s*(second|minute|hour|day|week|month|year)/; # We stop short of the "s" here, add it below, so it's optional.
   $latelyunit ||= 'minute';
   my $lately = DateTime::Format::ForDB(DateTime->now(@tz)->add( ($latelyunit . "s") => $latelynum ));

@@ -1,0 +1,271 @@
+<html><head>
+   <title>Arsinoe IRC Bot Help</title>
+   <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />
+</head><body>
+
+<div class="toc">
+  <div class="h">Table of Contents</div><ul>
+     <li><a href="#general">General Guidelines</a></li>
+     <li><a href="#basic">Basic Features</a><ul>
+         <li><a href="#about">!about</a></li>
+         <li><a href="#ping">!ping</a></li>
+         <li><a href="#rng">!rng, !race, !role</a></li>
+         <li><a href="#seen">!seen</a></li>
+         <li><a href="#time">!time</a></li>
+         <li><a href="#rot13">!rot13</a></li>
+         <li><a href="#backscroll">!backscroll</a></li>
+         <li><a href="#help">!help</a></li>
+       </ul></li>
+     <li><a href="#messages">Messages Between IRC Users</a><ul>
+           <li><a href="#tell">!tell</a></li>
+           <li><a href="#viewmessage">!message</a></li>
+       </ul></li>
+     <li><a href="#preferences">Your Preferences</a><ul>
+           <li><a href="#showpref">!show</a></li>
+           <li><a href="#setpref">!set</a></li>
+           <li><a href="#preftimezone"><code>timezone</code></a></li>
+       </ul></li>
+     <li><a href="#selfcommands">Personal Assistance (Keeping Track of Things)</a><ul>
+           <li><a href="#alarm">!alarm</a></li>
+           <li><a href="#todo">!todo</a></li>
+           <li><a href="#srs">!vocab</a></li>
+       </ul></li>
+     <li><a href="#clanstuff">Junethack Clan Support</a>
+           <li><a href="#deaths">!deaths</a></li>
+           <li><a href="#trophies">!trophies</a></li>
+           <li><a href="#member">!member list, !member add, !member subtract</a></li>
+           <li><a href="#anthem">!anthem</a></li>
+           <li><a href="#goteam">!gt</a></li>
+        <ul>
+        </ul></li>
+     <li><a href="#proxied">Proxied Commands</a><ul>
+          <li><a href="#rodney">Rodney</a>
+              (!hsn, !lastgame, !rc, !dumplog, !gamesby, !scores, !bugs,
+               !asc, !ascension, !lg, !grepsrc, !whereis, !streak, !save</li>
+          </ul></li>
+     <li><a href="#frivolity">Frivolous Pursuits</a><ul>
+         <li><a href="#tea">!tea</a></li>
+         <li><a href="#juice">!juice</a></li>
+         <li><a href="#foodservice">!milk, !pizza</a></li>
+         <li><a href="#vladsbane">!vladsbane</a></li>
+         <li><a href="#hangman">!hangman</a></li>
+         <li><a href="#scramble">!scramble</a></li>
+         </ul></li>
+  </ul>
+</div>
+
+<div class="h"><a name="general">General Guidelines</a></div>
+<div class="p">In general, you can /msg the bot any of the commands below, and it
+     will answer you with a /msg back.  Additionally, depending on
+     configuration, the bot may answer many of these commands in certain channels as well.
+</div>
+
+<div class="h"><a name="basic">Basic Features</a></div>
+<div class="p">
+  <div><a name="about" class="trigger">!about</a> <span class="triggerargs">[no arguments]</span></div>
+  Provides basic information about the bot, including the development name, version number,
+  author, current operator, and the URL of the git repository.
+</div>
+
+<div class="p">
+  <div><a name="ping" class="trigger">!ping</a> <span class="triggerargs">[no arguments]</span></div>
+  Provides a basic answer that serves to verify two-way communication between you and the bot.
+  Sibling bots also send this command to each other as part of looking out for one another.
+</div>
+
+<div class="p">
+  <div><a name="rng" class="trigger">!rng</a> <span class="triggerargs">Choice A | Choice B | Choice C ...</span></div>
+  <div><a name="race" class="trigger">!race</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="role" class="trigger">!role</a> <span class="triggerargs">[no arguments]</span></div>
+  Chooses at random between the given options (or from among the standard vanilla races or roles).
+</div>
+
+<div class="p">
+  <div><a name="seen" class="trigger">!seen</a> <span class="triggerargs">nick</span></div>
+  Reports when a given nick was last seen making a comment in any of the channels the bot frequents.
+  The bot considers 'private' (/msg) to be a channel in its own right and so will report if the
+  user was last seen there, but the content of the /msg will not be disclosed.
+</div>
+
+<div class="p">
+  <div><a name="time" class="trigger">!time</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="date" class="trigger">!time</a> <span class="triggerargs">[no arguments]</span></div>
+  Reports the current date and time.  Currently only UTC is supported.  (In the future, I
+  intend to make it report both UTC and whatever timezone you have set in your preference.)
+</div>
+
+<div class="p">
+  <div><a name="rot13" class="trigger">!rot13</a> <span class="triggerargs">any text</span></div>
+  Cresbezf gur EBG13 nytbevguz be lbhe grkg naq ergheaf vg gb lbh.
+</div>
+
+<div class="p">
+  <div><a name="backscroll" class="trigger">!backscroll</a> <span class="triggerargs">#channel number-of-lines</span></div>
+  Currently this is not implemented, but I intend to make the bot fill in
+  users who have missed recent channel content due to connection problems
+  (only upon request, of course).
+</div>
+
+<div class="p">
+  <div><a name="help" class="trigger">!help</a> <span class="triggerargs">command</span></div>
+  Print more detailed help information about the command.  Not all commands have detailed help info, but some do.
+</div>
+
+<div class="h"><a name="messages">Messages Between IRC Users</a></div>
+<div class="p">
+  <div><a name="tell" class="trigger">!tell</a> <span class="triggerargs">nick blah blah blah</span></div>
+  <div><a name="viewmessage" class="trigger">!message</a> <span class="triggerargs">number</span></div>
+  Use the !tell command to leave a message for another user.  The next time the bot sees that user
+  make a comment, the bot will tell the user about any messages that have been left.  If the user
+  only has one or two messages, the bot will just tell them the messages outright.  If there are a
+  larger number of messages, the bot will give the user a list of message ID numbers.  These message
+  ID numbers can be fed to the !message command to read each message.  (This is often best done in
+  private /msg, to avoid spamming the channel, especially if there are a lot of messages.)
+</div>
+
+
+<div class="h"><a name="preferences">Your Preferences</a></div>
+<div class="p">
+  <div><a name="showpref" class="trigger">!show</a> <span class="triggerargs">prefname</span></div>
+  Shows your current value for the preference.
+</div>
+<div class="p">
+  <div><a name="setpref" class="trigger">!set</a> <span class="triggerargs">prefname value</span></div>
+  Sets a different value for the preference for you.
+</div>
+<div class="p">
+  <div><a name="preftimezone" class="prefname">timezone</a></div>
+  Timezones must be specified in the format DateTime::Timezone uses.  For example, the Eastern timezone
+  should be specified as <q>America/New_York</q>.
+  <a href="http://search.cpan.org/dist/DateTime-TimeZone/">A list of all the timezones can be found here.</a>
+  Note that the bot actually checks to see that whatever you specify is on the list of valid timezones
+  and will not save your preference otherwise, for security reasons.
+</div>
+
+<div class="p">In the future, there may be additional preferences that you can set.</div>
+
+<div class="h"><a name="selfcommands">Personal Assistance:</a>  Keeping Track of Things</div>
+<div class="p">
+  <div><a name="alarm" class="trigger">!alarm</a> <span class="triggerargs">set date time message</span></div>
+  <div class="example"><code class="example">!alarm set Friday at 11am Call mom and say Happy Birthday.</code></div>
+  <div class="example"><code class="example">!alarm set 2015 Jan 20 Renew domains before they expire.</code></div>
+  Note that this feature is currently only really useful if your IRC client stays connected pretty much
+  all the time.  In the future, I want to make the bot check to see if you're online, /msg you right
+  away if so, and otherwise leave you a message (like !tell but automatic).  However, this has not yet
+  been implemented, so the bot just tries to /msg you.  If you are offline, you will miss the alarm.
+</div>
+
+<div class="p">
+  <div><a name="alarms" class="trigger">!alarms</a> <span class="triggerargs">[no arguments]</span></div>
+  Lists how many alarms you currently have set.  If there are only one or two, it also tells you
+  when they are set to go off.  If there are more, it gives you alarm ID numbers, which you can
+  feed to the !alarm command.
+</div>
+
+<div class="p">
+  <div><a name="alarmshow" class="trigger">!alarm</a> <span class="triggerargs">alarm-ID-number</span></div>
+  Tells you when a particular alarm is set to go off.
+</div>
+
+<div class="p">
+  <div><a name="todo" class="trigger">!todo</a> <span class="triggerargs"></span></div>
+  This feature has not yet been implemented.
+</div>
+
+<div class="p">
+  <div><a name="srs" class="trigger">!vocab</a> <span class="triggerargs"></span></div>
+  I intend to also make the bot an interface to my spaced repetition system for
+  studying vocabulary, but this has not yet been implemented.
+</div>
+
+
+<div class="h"><a name="clanstuff">Junethack Clan Support</a></div>
+<div class="p">
+  <div><a name="deaths" class="trigger">!deaths</a> <span class="triggerargs">url</span></div>
+  <div><a name="deathsreparse" class="trigger">!deaths</a> <span class="triggerargs">reparse</span></div>
+  <div><a name="deathspartial" class="trigger">!deaths</a> <span class="triggerargs">partial</span></div>
+  <div><a name="deathsfetch" class="trigger">!deaths</a> <span class="triggerargs">fetch</span> (this is the default)</div>
+  <div><a name="deathsclan" class="trigger">!deaths</a> <span class="triggerargs">clan=clanabbrev</span></div>
+  <div>All versions send back the URLs for the <q>deaths needed</q> and <q>deaths obtained</q> pages.</div>
+  <div>With reparse, stored local copies of the data are reprocessed.  (This is useful when doing multiple clans.)</div>
+  <div>With partial, one clan's data (the specified clan, or our clan by default) are retrieved from the junethack site.</div>
+  <div>With fetch, or if no argument is given, all clan data are retrieved from the junethack site, which takes a couple of minutes. 
+       The bot will wait until this finishes before sending back the URL, so you will know when it's done.</div>
+  <div>If you specify a clan (using the same abbreviation used on the deaths needed page), everything will
+       be presented from that clan's perspective.</div>
+</div>
+
+<div class="p">
+  <div><a name="trophies" class="trigger">!trophies</a> <span class="triggerargs">[no arguments]</span></div>
+  Retrieves junethack data on all our clan members and returns the URL for a unified list of all the trophies,
+  indicating whether anyone in the clan has yet obtained them.  (Hovering over a trophy will tell which
+  trophy it is and who has obtained it so far, if anyone in the clan has, or how to get it, otherwise.)
+</div>
+
+<div class="p">
+  <div><a name="member" class="trigger"></a> <span class="triggerargs">list</span></div>
+  <div><a name="memberadd" class="trigger"></a> <span class="triggerargs">add nick tournamentaccount</span></div>
+  <div><a name="membersubtract" class="trigger"></a> <span class="triggerargs">subtract nick</span></div>
+  This functionality hasn't yet been ported over from version 005.
+</div>
+
+<div class="p">
+  <div><a name="anthem" class="trigger">!anthem</a> <span class="triggerargs">[no arguments]</span></div>
+  Gives the URL for a proposed clan anthem.
+</div>
+
+<div class="p">
+  <div><a name="goteam" class="trigger">!gt</a> <span class="triggerargs">whoever</span></div>
+  Cheers on the person you specify, if they are a member of the clan, or otherwise cheers on the clan.
+</div>
+
+
+<div class="h"><a name="proxied">Proxied Commands</a></div>
+<div class="p">
+  <div><a name="rodney">Rodney</a>:</div>
+  Rodney, the NAO bot that frequents #nethack, can answer the following things:
+  <div><span class="trigger">!hsn</span>
+       <span class="trigger">!lastgame</span>
+       <span class="trigger">!rc</span>
+       <span class="trigger">!dumplog</span>
+       <span class="trigger">!gamesby</span>
+       <span class="trigger">!scores</span>
+       <span class="trigger">!bugs</span>
+       <span class="trigger">!asc</span>
+       <span class="trigger">!ascension</span>
+       <span class="trigger">!lg</span>
+       <span class="trigger">!grepsrc</span>
+       <span class="trigger">!whereis</span>
+       <span class="trigger">!streak</span>
+       <span class="trigger">!save</span>
+  </div> 
+  Our bot knows how to ask Rodney (by /msg) and proxy back his answer.
+  For detailed help on what any of these commands do and how to use
+  them, <a href="http://pgp.dtype.org/nethack/Rodney/bothelp.php">see Rodney's help file</a>
+</div>
+
+
+<div class="h"><a name="frivolity">Frivolous Pursuits</a></div>
+<div class="p">
+  <div><a name="tea" class="trigger">!tea</a> <span class="triggerargs">type nick</span></div>
+  <div><a name="juice" class="trigger">!juice</a> <span class="triggerargs">nick</span></div>
+  <div><a name="coffee" class="trigger">!coffee</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="foodservice" class="trigger">!milk</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="pizza" class="trigger">!pizza</a> <span class="triggerargs">[no arguments]</span></div>
+  Serves up the requested beverage or food.  Types of tea that can be specified include black,
+  green, white, oolang, and herbal.  (You don't get to specify all the details.  A certain amount
+  of randomness is part of the fun.)  All arguments to these commands are optional.
+</div>
+
+<div class="p">
+  <div><a name="vladsbane" class="trigger">!vladsbane</a> <span class="triggerargs">[No arguments]</span></div>
+  Suggests something you might use to kill Vlad the Impaler in your current NetHack game.
+</div>
+
+<div class="p">
+  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargs"></span></div>
+  This game has not yet been implemented.
+</div>
+
+
+</body></html>
