@@ -260,8 +260,9 @@ $keytable
 
 ] . (join "\n", map {
   my $cl = $_;
-  qq[<div class="clanexclusive"><div class="h"><a name="excl$cl">Exclusive deaths unique to
+  qq[<div class="h"><a name="excl$cl">Exclusive deaths unique to
         <span class="$clanclass{$cl}$classcnt{$cl}">$cl</span></a> ($exclusive{$cl}): </div>
+<div class="clanexclusive p">
   ] . (join qq[&nbsp;<span class="$clanclass{$cl}$classcnt{$cl}">/</span> ],
        map { qq[<span class="excldeath">$_</span>] }
        @{$exclist{$cl}}) . qq[</div>]

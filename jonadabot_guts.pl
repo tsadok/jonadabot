@@ -5,26 +5,31 @@ use AnyEvent::IRC::Util qw(encode_ctcp);
 
 our %demilichen; # populated later
 
-our %debug = ( # TODO: override these defaults from the DB, after the DB code is loaded.
-              alarm      => 7,
+our %debug = ( # These are the default defaults...
+              alarm      => 1,
               biff       => 1,
               bottrigger => 1,
-              connect    => 2,
+              connect    => 1,
               ctcp       => 1,
               echo       => 0,
-              filewatch  => 7,
+              filewatch  => 1,
               groupnick  => 0,
               irc        => 0,
               login      => 0,
               pingtime   => 1,
               pop3       => 1,
-              preference => 3,
+              preference => 1,
               privatemsg => 0,
               publicmsg  => 0,
               say        => 0,
-              smtp       => 7,
+              smtp       => 1,
               tea        => 0,
             );
+# But we can override them with values from the DB:
+for my $dflt (getconfigvar($cfgprofile, "debug")) {
+  my ($k, $v) = split /[=]/, $dflt;
+  $debug{$k} = $v || $debug{$k};
+}
 
 
 %prefdefault = (
