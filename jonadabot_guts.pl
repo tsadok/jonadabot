@@ -393,14 +393,13 @@ sub say {
     $irc->send_srv(PRIVMSG => $arg{sender}, $message);
   } elsif ($arg{force}) {
     $irc->send_srv(PRIVMSG => $arg{channel}, $message);
-  } elsif ((grep { $$_{value} eq $arg{channel}
+  } elsif ((grep { $_ eq $arg{channel}
                  } getconfigvar($cfgprofile, 'ircchanokdom'),
                    getconfigvar($cfgprofile, 'ircchannel'))
-           and not (grep { $$_{value} eq $arg{channel} } getconfigvar($cfgprofile, 'ircchansilent'))
+           and not (grep { $_ eq $arg{channel} } getconfigvar($cfgprofile, 'ircchansilent'))
           ) {
     my @myrecent = grep { /^Arsinoe/ } @{$irc{channel}{lc $arg{channel}}{recentactivity}};
-    if ((5 >= @myrecent) or (grep { $$_{value} eq $arg{channel}
-                                  } getconfigvar($cfgprofile, 'ircchanokdom'))) {
+    if ((5 >= @myrecent) or (grep { $_ eq $arg{channel} } getconfigvar($cfgprofile, 'ircchanokdom'))) {
       #$message =~ s~^/me ~$irc{nick}[0] ~;
       if ($message =~ m!^/me !) {
         $message =~ s!^/me (.*)!ACTION $1!;
