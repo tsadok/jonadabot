@@ -72,7 +72,7 @@ our %routine = (
                             );
                   return "/me serves up " . (join " ", grep { $_ } map {
                     my $k = $_;
-                    my $choice = $bev{$trigger}{$k}[int rand int rand rand @{$bev{$trigger}{$k}}];
+                    my $choice = $bev{$trigger}{$k}[int rand rand @{$bev{$trigger}{$k}}];
                     my $clause = $choice;
                     if ($k eq 'sweeten')  { $clause = "sweetened with $choice" if $choice; }
                     if ($k eq 'flavors')  { $clause = "flavored with $choice" if $choice; }

@@ -393,12 +393,14 @@ sub say {
     $irc->send_srv(PRIVMSG => $arg{sender}, $message);
   } elsif ($arg{force}) {
     $irc->send_srv(PRIVMSG => $arg{channel}, $message);
-  } elsif ((grep { $_ eq $arg{channel} } @{$irc{chan}})
-           and not $irc{silent}{$arg{channel}}) {
-    # We're in the channel, so it's probably OK to respond there.
-    # But not too frequently...
+  } elsif ((grep { $$_{value} eq $arg{channel}
+                 } getconfigvar($cfgprofile, 'ircchanokdom'),
+                   getconfigvar($cfgprofile, 'ircchannel'))
+           and not (grep { $$_{value} eq $arg{channel} } getconfigvar($cfgprofile, 'ircchansilent'))
+          ) {
     my @myrecent = grep { /^Arsinoe/ } @{$irc{channel}{lc $arg{channel}}{recentactivity}};
-    if ((5 >= @myrecent) or ($irc{okdom}{$arg{channel}})) {
+    if ((5 >= @myrecent) or (grep { $$_{value} eq $arg{channel}
+                                  } getconfigvar($cfgprofile, 'ircchanokdom'))) {
       #$message =~ s~^/me ~$irc{nick}[0] ~;
       if ($message =~ m!^/me !) {
         $message =~ s!^/me (.*)!ACTION $1!;
