@@ -1022,7 +1022,7 @@ sub handlemessage {
     my ($mnemonic, $subject, $restofmessage) = ($1, $2, $3);
     my $contact = findrecord("emailcontact", "ircnick", $sender, "mnemonic", $mnemonic); # TODO: support nick aliases.
     if ($contact) {
-      my $body = $subject . $restofmessage . ($$contact{signature} || "\n --$sender\n");
+      my $body = $subject . " " . $restofmessage . ($$contact{signature} || "\n --$sender\n");
       my $from = getconfigvar($cfgprofile, 'operatoremailaddress'); # TODO: allow the operator to establish different from fields for different users.
       my $dest = getrecord("emaildest", $$contact{emaildest});
       my $result = addrecord("mailqueue", +{ tofield   => $$dest{address},
