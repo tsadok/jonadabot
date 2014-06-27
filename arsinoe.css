@@ -8,6 +8,7 @@ div.p, div.h {
   background-color:  #666666;
   color:             #EEEEEE;
 }
+
 div.h {
   font-size:         125%;
   margin:            0.8em;
@@ -16,10 +17,14 @@ div.h {
   border-top-right-radius:   1em;
   border-bottom:     2px dashed #AAAAAA;
 }
+div + div.h {
+  margin-top:        3em;
+}
+
 div.p {
   margin:            1em;
   padding:           1em;
-  border-radius:     0.5em;
+  border-radius:     1em;
 }
 div.h + div.p {
   margin-top:        -1em;

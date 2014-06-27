@@ -1,5 +1,6 @@
 Known bugs:
- * 
+ * When setting an alarm, the date is not optional.  You have to
+   at least say "today", which is annoying.
 
 Features Wanted:
  * TODO-list management:
