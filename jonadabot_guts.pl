@@ -185,7 +185,8 @@ sub checksiblings {
   logit("Checking on siblings") if $debug{siblings};
   my @sibling = getconfigvar($cfgprofile, 'sibling');
   return if not @sibling;
-  my $mins   = getconfigvar($cfgprofile, 'siblingminutes') || 3;
+  my $mins   = (getconfigvar($cfgprofile, 'siblingminutes') + 0) || 3;
+  logit("sibling mins: $mins") if $debug{siblings} > 5;
   my $now    = DateTime->now(@tz);
   my $once   = DateTime::Format::ForDB($now->clone()->subtract( minutes => $mins ));
   my $twice  = DateTime::Format::ForDB($now->clone()->subtract( minutes => (2 * $mins)));
@@ -195,7 +196,7 @@ sub checksiblings {
     logit("Checking on $sib", 3) if $debug{siblings} > 3;
     my ($seen) = findrecord('seen', 'nick', $sib);
     if ($$seen{whenseen} lt $thrice) {
-      logit("Thrice: haven't seen $sib since $$seen{whenseen}, pinging operator");
+      logit("Thrice: haven't seen $sib since $$seen{whenseen} (limit $thrice), pinging operator");
       say("Hey, $irc{oper}, I haven't heard from $sib since $$seen{whenseen}.",
           channel => 'private', sender => $irc{oper});
     } elsif ($$seen{whenseen} lt $twice) {

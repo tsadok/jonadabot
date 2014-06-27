@@ -74,13 +74,14 @@ our $startuptime      = DateTime->now(@tz);
 my @stage = ("'Aleph", qw(Beth Gimmel Daleth He Waw Zayin Heth Teth Yodh Kaph Lamedh Mem Nun Samekh), "`Ayin", qw(Pe Tsadhe Qoph Resh Sin Shin Taw));
 warn "Stage " . (shift @stage);
 our (%pop3, %watchregex, %sms, %smtp); # TODO: some of these hashes will eventually all be ripped out in favor of database tables (but not the regexes).
-do $utilsubs; warn "Stage " . (shift @stage) . " (did utilsubs)";
-do $dbcode;   warn "Stage " . (shift @stage) . " (did dbcode)";
-do $regexen;  warn "Stage " . (shift @stage) . " (did regexes)";
-do $teacode;  warn "Stage " . (shift @stage) . " (did tea code)";
-#do $dbcode;  warn "Stage " . (shift @stage) . " (did db code)";
+do $utilsubs;  warn "Stage " . (shift @stage) . " (did utilsubs)";
+do $dbcode;    warn "Stage " . (shift @stage) . " (did dbcode)";
+do $regexen;   warn "Stage " . (shift @stage) . " (did regexes)";
+do $extrasubs; warn "Stage " . (shift @stage) . " (did extrasubs)";
+do $teacode;   warn "Stage " . (shift @stage) . " (did tea code)";
+#do $dbcode;   warn "Stage " . (shift @stage) . " (did db code)";
 our (%debug, %irc, %prefdefault, @notification, @scriptqueue, $jotcount);
-do $guts;     warn "Stage " . (shift @stage) . " (did guts)";
+do $guts;      warn "Stage " . (shift @stage) . " (did guts)";
 
 # Rudimentary restart-flood protection:
 my @recentstart = getsince('startuprecord', 'whenstarted', $startuptime->clone()->subtract( hours => 3 ));
