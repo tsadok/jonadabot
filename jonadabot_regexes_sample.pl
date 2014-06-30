@@ -58,22 +58,88 @@
                            ],
 
                Rodney => [# This watch key is designed to be assigned to an irssi logfile of #nethack
-                          [ Death  => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)], (\d+) points, T:(\d+), (.*)/,
-                                      undef, [qw(player score turn killer)],
+                          [ Death  => qr/Rodney.*?((\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)], (\d+) points, T:(\d+), (.*))/,
+                                      undef, [qw(majorpart player score turn killer)],
                             sub { my ($line, %matchvar) = @_;
                                   if (isclanmember($matchvar{player})) {
                                     if ($matchvar{killer} eq 'ascended') {
-                                      return $routine{congrats}->(); # match and followup
-                                    } else { return 1; } # just match
+                                      return $matchvar{majorpart}, $routine{congrats}->(); # match and followup
+                                    } else { return $matchvar{majorpart}; } # just match
                                   } else { return; } # no match after all, this is not one of our players
                                 },],
                           [ Wish   => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)] wished for ["]([^"]*)["], on turn (\d+)/,
-                                      undef, [qw(player wish turn)] sub { return isclanmember($matchvar{player}) ? 1 : undef }],
+                                      undef, [qw(player wish turn)],
+                            sub { return isclanmember($matchvar{player}) ? $matchvar{majorpart} : undef }],
                           [ AoLS   => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)] averted death, on turn (\d+)/,
-                                      undef, [qw(player turn)], sub { return isclanmember($matchvar{player}) ? 1 : undef } ],
+                                      undef, [qw(player turn)],
+                            sub { return isclanmember($matchvar{player}) ? $matchvar{majorpart} : undef } ],
                           [ Achiev => qr/Rodney.*?(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)] (performed the invocation|entered the Planes), on turn (\d+)/,
                                       undef, [qw(player achievement turn)],
-                            sub { return isclanmember($matchvar{player}) ? $routine{ganbatte}->() : undef; } ],
+                            sub {
+                              if (isclanmember($matchvar{player})) {
+                                return $matchvar{majorpart}, $routine{ganbatte}->();
+                              } else {
+                                return;
+                              }}, ],
                         ],
+               xlog =>     [# This doesn't read an xlogfile directly.
+                            # Instead, it reads the output of a support script.
+                            # This one is intended for clan-relevant deaths only.
+                            [ Death => qr/[<]\s*(\w+)\s*[>]\s+(\w+)\s*[(](?:[A-Z][a-z][a-z]\s*)+[)], (\d+) points, T:(\d+), (.*)/,
+                              undef, [qw(variant player score turn killer)],
+                              sub { my ($line, %matchvar) = @_;
+                                    if (findrecord('clanmembersrvacct', 'serveraccount', $matchvar{player})) {
+                                      if ($matchvar{killer} =~ /ascended/) {
+                                        return $routine{congrats}->();
+                                      } else { return 1; }
+                                    } else { return; }
+                                  }, ],
+                            ],
+               xlogfile => [# This one is intended to read an xlogfile directly, for announcing all the deaths on
+                            # a channel, much like Rodney does; but it is only VERY lightly tested.
+                            # This is an unusual case because pretty much EVERY line is expected to match.
+                            [xlogfile => qr/^version=([^:])[:]/, ],
+                            undef, ['version'],
+                            sub { my ($line, %matchvar) = @_;
+                                  my %val  = map { /([^=]+)=(.*)/; ($1, $2)  } split /[:]/, $line;
+                                  my %bfstring;
+                                  my %bitfield = (conduct => +[ # order matters
+                                                               'foodless', 'vegan', 'vegetarian', 'atheist',
+                                                               'weaponless', 'pacifist', 'illiterate', 'polyitemless',
+                                                                'polyselfless', 'wishless', 'artiwishless', 'genoless',
+                                                              ],
+                                                  achieve => [ 'Bell', 'Gehennom', 'Candelabrum', 'Book',
+                                                               'Invocation', 'Amulet', 'Endgame', 'Astral',
+                                                               'Ascended', 'Luckstone', 'Sokoprize', 'Medusa',
+                                                             ],);
+                                  my %obsoletedby = ( vegetarian  => 'vegan',
+                                                      vegan       => 'foodless',
+                                                      wishless    => 'artiwishless',
+                                                      Gehennom    => 'Invocation',
+                                                      Bell        => 'Invocation',
+                                                      Book        => 'Invocation',
+                                                      Candelabrum => 'Invocation',
+                                                      Invocation  => 'Amulet',
+                                                      Amulet      => 'Endgame',
+                                                      Endgame     => 'Astral',
+                                                      Astral      => 'Ascended',
+                                                    );
+                                  for my $bf (@bitfield) {
+                                    my @bit    = unpack((join '', map { 'b1' } 1 .. scalar @{$bitfield{$bf}}), $val{$bf});
+                                    my @bfitem = grep { $_ } map { $bit[$_] ? $bitfield{$bf}[$_] : undef } 0 .. ((scalar @bit) - 1);
+                                    $val{"all_$bf"} = join ' ', @bfitem;
+                                    my %isobs; for my $i (@bfitem) {
+                                      $isobs{$i}++ if $obsoletedby{$i} and grep { $_ eq $isobsoletedby{$i} } @bfitem;
+                                    }
+                                    @bfitem = grep { not $isobs{$_} } @bfitem;
+                                    $val{"notobs_$bf"} = join ' ', @bfitem;
+                                  }
+                                  my $showcond = ($val{death} =~ /ascended|celestial/) ? qq[ $val{notobs_conduct}] : '';
+                                  my $showach  = ($val{death} =~ /ascended|celestial/) ? '' : qq[$val{notobs_achieve}, ];
+                                  return qq[$val{$name} ($val{role} $val{race} $val{gender} {$val{align}}), DL$val{deathlev}/$val{maxlvl}, $showach$val{points} points, T:$val{turns}, $val{death}$showcond];
+                            },
+                           ],
+
+
               );
 

@@ -1267,7 +1267,7 @@ sub handlemessage {
           if ($irc{master}{$sender} or not $$t{flags} =~ /M/) { # M means master-only bottrigger
             if ($$t{flags} =~ /R/) { # R means Routine bottrigger, as opposed to flat text
               if ($routine{$$t{answer}}) {
-                my $response = $routine{$$t{answer}}->($$t{bottrigger}, channel => $howtorespond, text => $text);
+                my $response = $routine{$$t{answer}}->($$t{bottrigger}, channel => $howtorespond, text => $text, sender => $sender);
                 # TODO: pass more args there to allow routines more flexibility in what they can do.
                 if ($response) {
                   say($response, channel => $howtorespond, sender => $sender, fallbackto => 'private')

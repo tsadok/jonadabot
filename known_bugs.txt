@@ -1,6 +1,7 @@
 Known bugs:
  * When setting an alarm, the date is not optional.  You have to
    at least say "today", which is annoying.
+ * The !brownies trigger (for foodservice) is buggy.
 
 Features Wanted:
  * TODO-list management:
@@ -15,6 +16,7 @@ Features Wanted:
      or a semi-random generic greeting (otherwise).
  * Add a watch regex for demogorgon's "killed the ghost of"
      that only does anything if the ghost is from your clan.
- * Play hangman and scrambled word games.
+ * Play a scrambled word game.
  * Implement recurring alarms.
  * Basic numerical calculations.
+ * !zap

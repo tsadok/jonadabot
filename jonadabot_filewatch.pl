@@ -13,7 +13,7 @@ sub watchlogfile {
   logit("" . @watch . " watch records found", 2) if $debug{filewatch} > 2;
   my ($whenseen, $expires, $note);
   for my $watch (@watch) {
-    my ($ismatch, $followup);
+    my ($ismatch, @followup);
     if ($$watch{isregexkey}) {
       logit("Watch record is a regex key", 3) if $debug{filewatch} > 2;
       for my $watchitem (@{$watchregex{$$watch{matchstring}}}) {
@@ -26,7 +26,7 @@ sub watchlogfile {
           @matchvar{@$fieldlist} = ($1, $2, $3, $4, $5, $6, $7, $8, $9);
           chomp $line;
           if (ref $callback) {
-            my $answer = $callback->($line, %matchvar);
+            my ($answer, @more) = $callback->($line, %matchvar);
             if ($answer eq 1) {
               $ismatch++;
               $note     ||= join ", ", @$fieldlist;
@@ -36,12 +36,8 @@ sub watchlogfile {
             } else {
               $ismatch++;
               $note     ||= join ", ", @$fieldlist;
-              if ($followup) {
-                logit("Discarding extra followup line, we allow only one") if $debug{filewatch};
-              } else {
-                $followup = $answer;
-                logit("Callback returned followup line.") if $debug{filewatch} > 4;
-              }
+                push @followup, $_ for ($answer, @more);
+                logit("Callback returned followup line(s).") if $debug{filewatch} > 4;
             }
           } else {
             $ismatch++;
@@ -82,7 +78,7 @@ sub watchlogfile {
           say($msg, channel => $$watch{channel}, sender => $irc{oper}, fallbackto => 'private');
           # TODO: maybe add a flag to not fall back to private /msg
           logit("Echoed to $$watch{channel}") if $debug{filewatch} > 5;
-          if ($followup) {
+          for my $followup (@followup) {
             say($followup, channel => $$watch{channel}, sender => $irc{oper}, fallbackto => 'private');
             logit("Following comment sent to $$watch{channel}") if $debug{filewatch} > 5;
           }
