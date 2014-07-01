@@ -38,6 +38,13 @@ div.h + div.p {
 .triggerargs {
   color:             #33AAFF;
 }
+.triggerargsnone {
+  color:             #33FFAA;
+}
+.prefname,
+.triggerargverbatim {
+  color:             #FFAA33;
+}
 
 table th,
 table td {
@@ -122,6 +129,12 @@ table#trophycase td {
 .nothreat7 {
   color:             #6666FF;
 }
+.nothreat8 { 
+  color:             #3333CC;
+}
+.nothreat9 {
+  color:             #0000AA;
+}
 
 a {
   color:             #FFFFFF;
@@ -135,4 +148,8 @@ div.clanexclusive {
 }
 span.excldeath {
   display:           inline-block;
+}
+
+.fineprint {
+  font-size:         75%;
 }

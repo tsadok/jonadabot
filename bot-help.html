@@ -58,23 +58,31 @@
      configuration, the bot may answer many of these commands in certain channels as well.
 </div>
 
+<div class="p fineprint">These are just the commands that anyone can use.  
+     If the bot recognizes you as one of its <q>masters</q>, there are
+     additional commands available to you.  See master-commands.txt
+     in <a href="https://gitorious.org/jonadabot">the git repo</a>.</div>
+
 <div class="h"><a name="basic">Basic Features</a></div>
 <div class="p">
-  <div><a name="about" class="trigger">!about</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="about" class="trigger">!about</a> <span class="triggerargsnone">[no arguments]</span></div>
   Provides basic information about the bot, including the development name, version number,
   author, current operator, and the URL of the git repository.
 </div>
 
 <div class="p">
-  <div><a name="ping" class="trigger">!ping</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="ping" class="trigger">!ping</a> <span class="triggerargsnone">[no arguments]</span></div>
   Provides a basic answer that serves to verify two-way communication between you and the bot.
   Sibling bots also send this command to each other as part of looking out for one another.
 </div>
 
 <div class="p">
-  <div><a name="rng" class="trigger">!rng</a> <span class="triggerargs">Choice A | Choice B | Choice C ...</span></div>
-  <div><a name="race" class="trigger">!race</a> <span class="triggerargs">[no arguments]</span></div>
-  <div><a name="role" class="trigger">!role</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="rng" class="trigger">!rng</a>
+            <span class="triggerargs">Choice A <span class="triggerargverbatim">|</span>
+                                      Choice B <span class="triggerargverbatim">|</span> Choice C ...</span></div>
+  <div><span class="trigger">!rng</span> <span class="triggerargs">Choice_One Choice_Two Choice_Three ...</span></div>
+  <div><a name="race" class="trigger">!race</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a name="role" class="trigger">!role</a> <span class="triggerargsnone">[no arguments]</span></div>
   Chooses at random between the given options (or from among the standard vanilla races or roles).
 </div>
 
@@ -86,8 +94,8 @@
 </div>
 
 <div class="p">
-  <div><a name="time" class="trigger">!time</a> <span class="triggerargs">[no arguments]</span></div>
-  <div><a name="date" class="trigger">!time</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="time" class="trigger">!time</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a name="date" class="trigger">!time</a> <span class="triggerargsnone">[no arguments]</span></div>
   Reports the current date and time, using whichever timezone you have set in your preference.
   If this is different from UTC, the bot also reports the UTC hour and minute, in parentheses.
 </div>
@@ -144,7 +152,8 @@
 
 <div class="h"><a name="selfcommands">Personal Assistance:</a>  Keeping Track of Things</div>
 <div class="p">
-  <div><a name="alarm" class="trigger">!alarm</a> <span class="triggerargs">set date time message</span></div>
+  <div><a name="alarm" class="trigger">!alarm</a>
+       <span class="triggerargs"><span class="triggerargverbatim">set</span> date time message</span></div>
   <div class="example"><code class="example">!alarm set Friday at 11am Call mom and say Happy Birthday.</code></div>
   <div class="example"><code class="example">!alarm set 2015 Jan 20 Renew domains before they expire.</code></div>
   Note that this feature is currently only really useful if your IRC client stays connected pretty much
@@ -154,7 +163,7 @@
 </div>
 
 <div class="p">
-  <div><a name="alarms" class="trigger">!alarms</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="alarms" class="trigger">!alarms</a> <span class="triggerargsnone">[no arguments]</span></div>
   Lists how many alarms you currently have set.  If there are only one or two, it also tells you
   when they are set to go off.  If there are more, it gives you alarm ID numbers, which you can
   feed to the !alarm command.
@@ -179,11 +188,11 @@
 
 <div class="h"><a name="clanstuff">Junethack Clan Support</a></div>
 <div class="p">
-  <div><a name="deaths" class="trigger">!deaths</a> <span class="triggerargs">url</span></div>
-  <div><a name="deathsreparse" class="trigger">!deaths</a> <span class="triggerargs">reparse</span></div>
-  <div><a name="deathspartial" class="trigger">!deaths</a> <span class="triggerargs">partial</span></div>
-  <div><a name="deathsfetch" class="trigger">!deaths</a> <span class="triggerargs">fetch</span> (this is the default)</div>
-  <div><a name="deathsclan" class="trigger">!deaths</a> <span class="triggerargs">clan=clanabbrev</span></div>
+  <div><a name="deaths" class="trigger">!deaths</a> <span class="triggerargverbatim">url</span></div>
+  <div><a name="deathsreparse" class="trigger">!deaths</a> <span class="triggerargverbatim">reparse</span></div>
+  <div><a name="deathspartial" class="trigger">!deaths</a> <span class="triggerargverbatim">partial</span></div>
+  <div><a name="deathsfetch" class="trigger">!deaths</a> <span class="triggerargverbatim">fetch</span> (this is the default)</div>
+  <div><a name="deathsclan" class="trigger">!deaths</a> <span class="triggerargs"><span class="triggerargverbatim">clan=</span>clanabbrev</span></div>
   <div>All versions send back the URLs for the <q>deaths needed</q> and <q>deaths obtained</q> pages.</div>
   <div>With reparse, stored local copies of the data are reprocessed.  (This is useful when doing multiple clans.)</div>
   <div>With partial, one clan's data (the specified clan, or our clan by default) are retrieved from the junethack site.</div>
@@ -194,21 +203,21 @@
 </div>
 
 <div class="p">
-  <div><a name="trophies" class="trigger">!trophies</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="trophies" class="trigger">!trophies</a> <span class="triggerargsnone">[no arguments]</span></div>
   Retrieves junethack data on all our clan members and returns the URL for a unified list of all the trophies,
   indicating whether anyone in the clan has yet obtained them.  (Hovering over a trophy will tell which
   trophy it is and who has obtained it so far, if anyone in the clan has, or how to get it, otherwise.)
 </div>
 
 <div class="p">
-  <div><a name="member" class="trigger"></a> <span class="triggerargs">list</span></div>
-  <div><a name="memberadd" class="trigger"></a> <span class="triggerargs">add nick tournamentaccount</span></div>
-  <div><a name="membersubtract" class="trigger"></a> <span class="triggerargs">subtract nick</span></div>
+  <div><a name="member" class="trigger">!member</a> <span class="triggerargverbatim">list</span></div>
+  <div><a name="memberadd" class="trigger">!member</a> <span class="triggerargs"><span class="triggerargverbatim">add</span> nick tournamentaccount</span></div>
+  <div><a name="membersubtract" class="trigger">!member</a> <span class="triggerargs"><span class="triggerargverbatim">subtract</span> nick</span></div>
   This functionality hasn't yet been ported over from version 005.
 </div>
 
 <div class="p">
-  <div><a name="anthem" class="trigger">!anthem</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="anthem" class="trigger">!anthem</a> <span class="triggerargsnone">[no arguments]</span></div>
   Gives the URL for a proposed clan anthem.
 </div>
 
@@ -245,26 +254,26 @@
 
 <div class="h"><a name="frivolity">Frivolous Pursuits</a></div>
 <div class="p">
-  <div><a name="food" class="trigger">!food</a> <span class="triggerargs">[no arguments]</span></div>
-  <div><a name="pizza" class="trigger">!pizza</a> <span class="triggerargs">[no arguments]</span></div>
-  <div><a name="sandwiches" class="trigger">!sandwiches</a> <span class="triggerargs">[no arguments]</span></div>
-  <div><a name="dessert" class="trigger">!dessert</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="food" class="trigger">!food</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a name="pizza" class="trigger">!pizza</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a name="sandwiches" class="trigger">!sandwiches</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a name="dessert" class="trigger">!dessert</a> <span class="triggerargsnone">[no arguments]</span></div>
   <div><a name="tea" class="trigger">!tea</a> <span class="triggerargs">type nick</span></div>
   <div><a name="juice" class="trigger">!juice</a> <span class="triggerargs">nick</span></div>
-  <div><a name="coffee" class="trigger">!coffee</a> <span class="triggerargs">[no arguments]</span></div>
-  <div><a name="milk" class="trigger">!milk</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="coffee" class="trigger">!coffee</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a name="milk" class="trigger">!milk</a> <span class="triggerargsnone">[no arguments]</span></div>
   Serves up the requested food or beverage.  Types of tea that can be specified include black,
   green, white, oolang, and herbal.  (You don't get to specify all the details.  A certain amount
   of randomness is part of the fun.)  All arguments to these commands are optional.
 </div>
 
 <div class="p">
-  <div><a name="vladsbane" class="trigger">!vladsbane</a> <span class="triggerargs">[No arguments]</span></div>
+  <div><a name="vladsbane" class="trigger">!vladsbane</a> <span class="triggerargsnone">[No arguments]</span></div>
   Suggests something you might use to kill Vlad the Impaler in your current NetHack game.
 </div>
 
 <div class="p">
-  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargs">[no arguments]</span></div>
+  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargsnone">[no arguments]</span></div>
   Show the current hangman puzzle (or start a new one if necessary).
   Note that if you use private /msg to play you will get a separate puzzle just for you.
   If you play in a channel, you share the puzzle with everyone in the channel.
@@ -272,9 +281,9 @@
   Guess a letter.
   <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargs">word or phrase</span></div>
   Finish the puzzle.
-  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargs">guesses</span></div>
+  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargverbatim">guesses</span></div>
   Show what guesses you have made and how many you have left.
-  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargs">letters</span></div>
+  <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargverbatim">letters</span></div>
   Show remaining unguessed letters.
 </div>
 
