@@ -1,7 +1,10 @@
 
 my $workdir = "/b4/perl/xlogfiles";
 
-my %xlog = ( NH4 => 'http://nethack4.org/xlogfile.txt' );
+my %xlog = ( NH4 => 'http://nethack4.org/xlogfile.txt',
+             DNH => 'http://dnethack.ilbelkyr.de/xlogfile.txt',
+             GHO => 'http://grunthack.org/xlogfile',
+           );
 
 if (not grep { /reparse/ } @ARGV) {
   print "Retrieving xlog file(s)...\n";
@@ -17,10 +20,10 @@ my %seen = %{$$VAR1{seen}};
 #print Dumper(+{ VAR1 => $VAR1, seen => \%seen});
 
 print "Parsing xlog files...\n";
-open LOG, ">>", "/var/log/nh4-RodneyStyle.log";
 for my $k (keys %xlog) {
   print " * $k\n";
-  open XLOG, "<", $workdir . "/" . $k . "-xlog.txt";
+  open LOG, ">>", "/var/log/" . (lc $k) . "-RodneyStyle.log" or die "Cannot append to /var/log/" . (lc $k) . "-RodneyStyle.log";
+  open XLOG, "<", $workdir . "/" . $k . "-xlog.txt"        or die "Cannot read $workdir/" . $k . "-xlog.txt";
   while (<XLOG>) {
     chomp; my $line = $_;
     my %val;
@@ -33,8 +36,12 @@ for my $k (keys %xlog) {
       my ($time) = localtime($val{endtime}) =~ /(\d+[:]\d+)/;
       print LOG "$time < $k > $val{name} ($val{role} $val{race} $val{gender} $val{align}), $val{points} points, T:$val{turns}, $val{death}\n";
       $seen{$gameid}++;
+    } else {
+      print "Already seen: $gameid\n";
     }
   }
+  close LOG;
+  close XLOG;
 }
 
 print "Saving list of seen games...\n";
