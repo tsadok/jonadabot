@@ -897,7 +897,7 @@ sub handlemessage {
     if ($text =~ m~^!alarm set (.+)~i) {
       my ($setparams) = ($1);
       logit("Alarm: $sender wants to set $setparams") if $debug{alarm};
-      if ($setparams =~ m~(today|tomorrow|Sun|Mon|Tue|Wed|Thu|Fri|Sat|(?:\d*[-]?\s*(?:the|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*\d+(?:st|nd|rd)?))\s*(?:at)?\s*(\d+[:]?\d*[:]?\d*\s*(?:am|pm)?)\s*(.*)~i) {
+      if ($setparams =~ m~(today|tomorrow|Sun|Sunday|Mon|Monday|Tue|Tuesday|Wed|Wednesday|Thu|Thursday|Fri|Friday|Sat|Saturday|(?:\d*[-]?\s*(?:the|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*\d+(?:st|nd|rd)?))\s*(?:at)?\s*(\d+[:]?\d*[:]?\d*\s*(?:am|pm)?)\s*(.*)~i) {
         my ($datepart, $timepart, $message) = ($1, $2, $3);
         if ($debug{alarm} > 3) {
           logit("datepart: $datepart", 3);
