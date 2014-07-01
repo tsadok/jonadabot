@@ -1220,7 +1220,10 @@ sub handlemessage {
     #  logit("Shutdown at the request of $sender", 1);
     # TODO: might also be good to implement a disconnect/reconnect,
     #       perhaps in conjunction with multi-irc-network support for version 007 or 008.
-  } elsif ($text =~ /^!nick\s*(\w+)/ and $irc{master}{$sender}) {
+  } elsif ($text =~ /^!nicklist/ and $irc{master}{sender}) {
+    my $nicks = join ' ', uniq(getconfigvar($cfgprofile, 'ircnick'), $defaultusername);
+    say($nicks, channel => $howtorespond, sender => $sender, fallbackto => private);
+  } elsif ($text =~ /^!nick\s*(\w+)/) {
     my ($nick) = $1;
     my %isnick = map { $_ => 1 } (getconfigvar($cfgprofile, 'ircnick'), $defaultusername);
     if (($irc{master}{$sender} or getconfigvar($cfgprofile, 'allownicktrigger'))

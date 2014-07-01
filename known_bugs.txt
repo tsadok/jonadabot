@@ -2,7 +2,10 @@ Known bugs:
  * When setting an alarm, the date is not optional.  You have to
    at least say "today", which is annoying.
  * The !brownies trigger (for foodservice) is buggy.
-
+ * !reload is buggy.  What it really should do call a
+   loadconfigfromdb function that should also be used at startup,
+   and maybe have options to reload extrasubs and regexes
+   and possibly redo the filewatch pipes.
 Features Wanted:
  * TODO-list management:
      !todo set Remember to blah blah blah

@@ -1,0 +1,28 @@
+These commands are only available to persons whose current nick
+is recognized by the bot as a "master" (in the config table).
+
+!say to #channel blah blah blah
+!say to #channel /me is a puppet.
+!nicklist (list possible nicks this bot is configured to use)
+!nick newnick (switch to a different one of the configured nicks)
+!join #channel
+!part #channel
+!debug channels
+!debug recent (currently, this only sends data to the primary operator)
+!debug list (lists the features for which debug levels may be set)
+!debug set feature level (change the debug level for a feature; impacts the logfile detail level)
+!debug show feature (shows the debug level for a given feature)
+!email contact subject : rest of message (only works if your contact is listed in the bot's database)
+!sms contact shortmessage (only works if your contact is listed in the bot's database)
+!biff (only works if the bot has your POP3 account details in the database)
+!biff list (just list your POP3 mailboxes that the bot knows about in its database)
+!biff reset (treat all messages currently in your POP3 mailboxes as new/unreported)
+!biff mailbox number               (reports the subject of a particular message)
+!biff mailbox number Headerfield   (you can also get other headers)
+!biff mailbox number LINES         (or the number of lines in the message)
+!biff mailbox number SIZE          (or the size of the message in bytes)
+!biff mailbox number BODY          (or the entire message body, if it's short)
+!notifications (see how many biff notifications you have pending)
+!reload (currently broken)
+!shutdown (but note that the bot may be automatically restarted by an external process)
+
