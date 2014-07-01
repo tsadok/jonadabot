@@ -32,7 +32,8 @@ for my $dflt (getconfigvar($cfgprofile, "debug")) {
 }
 
 
-%prefdefault = (
+%prefdefault = ( # TODO: make it possible to override this hardcoded
+                 #       pref default with a default pref database record.
                 timezone => 'UTC',
                );
 
@@ -1370,18 +1371,27 @@ sub ampmtime {
 sub friendlytime { # TODO: make some parts of this customizable via userpref, beyond just the timezone.
   my ($whendt, $displaytz, $style) = @_;
   my $when = $whendt->clone();
-  $displaytz ||= $prefdefault{timezone} || $servertz;
+  $displaytz ||= $prefdefault{timezone} || $servertz || 'UTC';
   $when->set_time_zone($displaytz);
   my $now = DateTime->now( @tz )->set_time_zone($displaytz);
+  my $utc = '';
+  if ($displaytz ne ('UTC')) {
+    my $utcnow = DateTime->now( time_zone => 'UTC');
+    $utc = ' (' . $utcnow->hour . ":" . $utcnow->minute . ' ' . friendlytz($utcnow) . ')';
+  }
   if ($style eq 'announce') {
     return "It is now " . $when->day_name() . ", " . $when->year()
       . ' ' . $when->month_name() . ' ' . $when->mday() . " at " . ampmtime($when)
-      . " " . friendlytz($when);
+      . " " . friendlytz($when) . $utc;
+  } elsif ($style eq 'alarm') {
+    return ampmtime($when) . " " . friendlytz($when);
   } elsif (($when->ymd() eq $now->ymd())
       or ($when->clone()->add(hours => 12) > $now)) {
-    return "at " . ampmtime($when) . " " . friendlytz($when);
+    return "at " . ampmtime($when) . " " . friendlytz($when) . $utc;
   } elsif ($when->clone()->add( days => 5 ) > $now) {
     return "on " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when);
+  } elsif ($when->clone()->subtract( days => 5) < $now) {
+    return "this past " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when);
   } else {
     return "on " . $when->ymd() . ".";
   }
