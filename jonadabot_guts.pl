@@ -260,6 +260,33 @@ sub checkalarms {
       updaterecord('alarm', $alarm);
     }
   }
+  my $midnight = DateTime->new( year => $now->year, month => $now->month, day => $now->mday() );
+  my $tomorrow = $now->clone()->add(days => 1);
+  my @ralarm = grep { $$_{lasttripped} lt DateTime::Format::ForDB($midnight) } getrecord('recurringalarm');
+  for my $ralarm (@ralarm) {
+    logit("Considering recurring alarm $$ralarm{id}") if $debug{recurringalarm} > 1;
+    if (($$ralarm{dayofweek} and ($$ralarm{dayofweek} == $tomorrow->dow)) or
+       (($$ralarm{dayofmonth} and ($$ralarm{dayofmonth} == $tomorrow->mday())))) {
+      logit("Triggered recurring alarm $$ralarm{id}") if (($debug{alarm} > 4) or $debug{recurringalarm});
+      $$ralarm{lasttripped} = $dbnow;
+      my $when = DateTime->new( year      => $tomorrow->year(),
+                                month     => $tomorrow->month(),
+                                day       => $tomorrow->mday(),
+                                time_zone => (getircuserpref($$ralarm{nick}, 'timezone') || $prefdefault{timezone} || $servertz),
+                                hour      => $$ralarm{hour},
+                                minute    => $$ralarm{minute},
+                              );
+      addrecord('alarm', +{ nick      => $$ralarm{nick},
+                            sender    => $$ralarm{sender},
+                            setdate   => DateTime::Format::ForDB($dbnow),
+                            alarmdate => DateTime::Format::ForDB($when),
+                            message   => $$ralarm{message},
+                            flags     => 'A', # A means Automatically set, as opposed to directly by the user each time.
+                            status    => 0,
+                          });
+      updaterecord('recurringalarm', $ralarm);
+    }
+  }
 }
 
 sub doscript {
