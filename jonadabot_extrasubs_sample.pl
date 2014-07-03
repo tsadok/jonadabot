@@ -4,6 +4,123 @@
 # ircbot_extrasubs.pl is where installation-specific subroutines should be put.
 
 our %routine = (
+                hangman => sub {
+                  my ($trigger, %arg) = @_;
+                  my $text = $arg{text};
+                  my $context = ($arg{channel} eq 'private') ? $arg{sender} : $arg{channel};
+                  my $srec  = findrecord('userpref', 'username', $context, prefname => 'hangmanstate');
+                  my $state = (ref $srec) ? $$srec{value} : undef;
+                  logit("!hangman [$context] ($$srec{id}) " . ($state ? $state : "undef")) if $debug{hangman} > 1;
+                  if ((not $state) or ($state =~ /^DONE/)) { # start a new one
+                    logit("!hangman: starting new game",3) if $debug{hangman};
+                    my @wf = getconfigvar($cfgprofile, 'wordfile');
+                    return "Sorry, $irc{oper} needs to install a wordfile to support that game." if not @wf;
+                    my $word;
+                    open WORDFILE, "<", $wf[rand @wf]; {
+                      my @word = map { chomp; $_; } <WORDFILE>;
+                      close WORDFILE;
+                      $word = $word[rand @word];
+                    }
+                    if (not $word) {
+                      logit("!hangman: no word found");
+                      return "Failed to get a word, sorry.";
+                    }
+                    my $spacing = getircuserpref($arg{sender}, 'hangmanspacing');
+                    $spacing = '' if not defined $spacing;
+                    my $joiner = " "; $joiner = "" if ($spacing eq '0');
+                    logit("joiner '$joiner', per spacing pref '$spacing' for user $arg{sender}") if $debug{hangman} > 3;
+                    my $blanks = join $joiner, map { ($_ =~ /[a-z]/i) ? "_" : (($_ eq ',') ? '.' : $_ ) } split //, $word;
+                    my $right  = "";
+                    my $wrong  = "";
+                    my $bank   = join "", 'a' .. 'z';
+                    $state = join ",", ($blanks, $right, $wrong, $bank, $word);
+                    if ($$srec{id}) {
+                      $$srec{value} = $state;
+                      updaterecord('userpref', $srec);
+                    } else {
+                      addrecord('userpref', +{ username => $context,
+                                               prefname => 'hangmanstate',
+                                               value    => $state,
+                                             })
+                    }
+                    return "New Puzzle:  $blanks";
+                  } else {
+                    my ($blanks, $right, $wrong, $bank, $word) = split /[,]/, $state;
+                    my $maxguesses = getconfigvar($cfgprofile, 'hangmanduration') || 8;
+                    my $remaining  = $maxguesses - length $wrong;
+                    logit("!hangman: mg $maxguesses, re $remaining, r<$right>, w<$wrong>",3) if $debug{hangman} > 2;
+                    if ($remaining < 0) {
+                      $$srec{value} = "DONE:$word";
+                      updaterecord('userpref', $srec);
+                      logit("!hangman: rope shortened",4);
+                      return "$irc{oper} has shortened the rope!  You have been hanged!";
+                    } else {
+                      if ((index((lc $text), (lc $word)) >= 0)) {
+                        $$srec{value} = "DONE:$word";
+                        updaterecord('userpref', $srec);
+                        return "Yep.";
+                      } elsif ($text =~ /^!hangman (details|guesses|state)/) {
+                        return "Guessed Right: $right; Guessed Wrong: $wrong; $remaining guesses left.";
+                      } elsif ($text =~ /^!hangman (letters|bank)/) {
+                        return "Unguessed letters: $bank";
+                      } elsif ($text =~ /^!hangman\s*(?:guess)?\s*([a-z])$/i) { # Process guess
+                        my $letter = $1;
+                        logit("!hangman: guessing $letter",4) if $debug{hangman} > 3;
+                        if (index((lc $right . lc $wrong), (lc $letter)) > 0) {
+                          logit("!hangman: that's a repeat.", 5) if $debug{hangman} > 3;
+                          return "You have already guessed $letter";
+                        } elsif (index((lc $word), (lc $letter)) >= 0) {
+                          # Correct Guess:
+                          $right .= $letter;
+                          $bank =~ s/$letter//i;
+                          my %remains = map { (lc $_) => $_ } split //, $bank;
+                          my $spacing = getircuserpref($arg{sender}, 'hangmanspacing');
+                          $spacing = '' if not defined $spacing;
+                          my $joiner = " "; $joiner = "" if ($spacing eq '0');
+                          $blanks = join $joiner, map { $remains{lc $_} ? '_' : (($_ eq ',') ? '.' : uc $_) } split //, $word;
+                          logit("joiner '$joiner', per spacing pref '$spacing' for user $arg{sender}") if $debug{hangman} > 3;
+                          $$srec{value} = join ',', ($blanks, $right, $wrong, $bank, $word);
+                          if (not ($blanks =~ /[_]/)) {
+                            $$srec{value} = 'DONE';
+                          }
+                          updaterecord('userpref', $srec);
+                          logit("!hangman: correct", 5), if $debug{hangman} > 3;
+                          return "Correct:  $blanks";
+                        } else {
+                          # Incorrect Guess:
+                          $wrong .= $letter;
+                          $bank =~ s/$letter//i;
+                          my @bodypart = qw(gallows head body arm arm leg leg hand hand foot foot eye eye nose mouth ear ear);
+                          while ($maxguesses >= scalar @bodypart) { push @bodypart, 'piece of clothing'; }
+                          logit("!hangman: incorrect", 5) if $debug{hangman} > 3;
+                          if ($maxguesses < length $wrong) {
+                            $$srec{value} = "DONE:$word";
+                            updaterecord("userpref", $srec);
+                            logit("!hanged", 6) if $debug{hangman};
+                            return "/me draws a rope.  You have been hanged!";
+                          } else {
+                            my $bp = "a " . $bodypart[length $wrong];
+                            $bp =~ s/^a ([aeiou])/an $1/i;
+                            $$srec{value} = join ',', ($blanks, $right, $wrong, $bank, $word);
+                            updaterecord("userpref", $srec);
+                            logit("!hangman: $bp",6) if $debug{hangman};
+                            return "/me draws $bp.";
+                          }
+                        }
+                      } else {
+                        logit("!hangman: reporting status", 5) if $debug{hangman};
+                        # TODO: recalculate $blanks per the current requester's hangmanspacing pref.
+                        my %remains = map { (lc $_) => $_ } split //, $bank;
+                        my $spacing = getircuserpref($arg{sender}, 'hangmanspacing');
+                        $spacing = '' if not defined $spacing;
+                        my $joiner = " "; $joiner = "" if ($spacing eq '0');
+                        $blanks = join $joiner, map { $remains{lc $_} ? '_' : (($_ eq ',') ? '.' : uc $_) } split //, $word;
+                        logit("joiner '$joiner', per spacing pref '$spacing' for user $arg{sender}") if $debug{hangman} > 3;
+                        return $blanks;
+                      }
+                    }
+                  }
+                },
                 foodservice   => sub { # makes a good custom trigger, e.g., a !food trigger
                   my ($trigger, %arg) = @_;
                   $trigger =~ s/e?s$//;
