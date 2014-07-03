@@ -32,10 +32,12 @@ for my $dflt (getconfigvar($cfgprofile, "debug")) {
 }
 
 
-%prefdefault = ( # TODO: make it possible to override this hardcoded
-                 #       pref default with a default pref database record.
+%prefdefault = ( # This is the _default_ default, if the operator doesn't set a default in the DB.
                 timezone => 'UTC',
                );
+for my $k (keys %prefdefault) { # The default set in the database overrides the hardcoded one:
+  $prefdefault{$k} = getconfigvar($cfgprofile, "default$k") || $prefdefault{$k};
+} # And of course that in turn is overridden by user preference, on a per-user basis.
 
 my $defaultusername = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
 my $ourclan = getconfigvar($cfgprofile, 'clan') || 'demilichens'; # used more than one place below.
@@ -387,10 +389,10 @@ sub say {
   my $target = ($arg{channel} eq 'private') ? $arg{sender} : $arg{channel};
   logit("say [to $target]: $message") if $debug{say} > 1;
   if (($arg{channel} eq 'private') and ($arg{sender})) {
-    #$message =~ s~^/me ~$irc{nick}[0] ~;
-    if ($message =~ m!^/me !) { # TODO: test this.
-      $message =~ s!^/me (.*)!ACTION $1!;
-    }
+    $message =~ s~^/me ~$irc{nick}[0] ~;
+    #if ($message =~ m!^/me !) { # TODO: this doesn't work right; see if it can be made to work better.
+    #  $message =~ s!^/me (.*)!ACTION $1!;
+    #}
     $irc->send_srv(PRIVMSG => $arg{sender}, $message);
   } elsif ($arg{force}) {
     $irc->send_srv(PRIVMSG => $arg{channel}, $message);
@@ -830,10 +832,15 @@ sub handlemessage {
       my ($tzname) = grep { $_ eq $tz } DateTime::TimeZone->all_names();
       $tzname ||= $prefdefault{timezone};
       setircuserpref($sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
-    } elsif ($var eq '') {
+    } elsif ($var eq '') {# TODO: report all set prefs, not just timezone
       my $tz = getircuserpref($sender, 'timezone');
       say('timezone: $tz',
           channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+    } else {
+      my @possiblepref = getconfigvar($cfgprofile, 'userpref');
+      if (grep { $_ eq $var } @possiblepref) {
+        setircuserpref($sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
+      }
     }
   } elsif ($text =~ /^!message (\d+)/) {
     viewmessage(number => $1, channel => $howtorespond, sender => $sender, fallbackto => 'private');
@@ -1116,6 +1123,7 @@ sub handlemessage {
     logit("!biff command from $sender: $text") if $debug{biff} > 1;
     warn "!biff: no sender means no ownernick" if not $sender;
     my @box = findrecord("popbox", "ownernick", $sender);
+    logit("I know of " . @box . " pop boxes owned by $sender") if $debug{biff} > 3;
     my %box = map { $$_{mnemonic} => $_ } @box;
     if ($text =~ /^!biff reset/) {
       logit("Doing !biff reset for $sender (" . @box . " mailboxes)") if $debug{biff};
