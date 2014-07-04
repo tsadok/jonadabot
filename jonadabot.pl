@@ -106,11 +106,7 @@ addrecord('startuprecord', +{
                              whenstarted => DateTime::Format::ForDB($startuptime),
                              psid        => $$, }, );
 
-our %demilichen = map {
-  my $dl = $_;
-  ($dl => 1, (lc $dl) => 1)
-} @{$irc{demi}}; # TODO: rip this out and use the database table
-warn "Stage " . (shift @stage) . " (built clan hash)";
+warn "Stage " . (shift @stage) . " (added startup record)";
 
 our %botwatch;
 use Data::Dumper; warn Dumper(+{ debug => \%debug });
@@ -136,7 +132,7 @@ for my $log (@log) { # X means disabled.
     $botwatch{$$log{id}}{watcher} = AnyEvent->io( fh   => $pipe,
                                                   poll => "r",
                                                   cb   => sub {
-                                                    watchlogfile(+{%demilichen}, $log, \%botwatch);
+                                                    watchlogfile($log, \%botwatch);
                                                   },
                                                 );
     logit("Watcher established for log $$log{id}", 4) if $debug{filewatch} > 1;

@@ -3,8 +3,6 @@
 
 use AnyEvent::IRC::Util qw(encode_ctcp);
 
-our %demilichen; # populated later
-
 our %debug = ( # These are the default defaults...
               alarm      => 1,
               biff       => 1,
@@ -115,9 +113,25 @@ sub error {
   logit("ERROR: $errortype: $message");
 }
 
-sub isclanmember {
+sub clanmemberisours {
+  my ($cmid) = @_;
+  my $year = DateTime->now(@tz)->year();
+  my @cmr = grep { ($$_{year} eq $year) and
+                   ($$_{clanname} eq $ourclan)
+                 } findrecord('clanmemberid', 'id', $cmid);
+}
+# The next two functions could be optimized by not bothering to check
+# if the clan member is ours, but then you'd only be able to support
+# one clan at a time ever; I am tempted to want to be able to support
+# multiple clans in multiple channels at some point.  Plus, I may want
+# to keep last year's data in the database.
+sub playerisclanmember {
   my ($username) = @_;
-  return findrecord('clanmembersrvacct', 'serveraccount', $username);
+  return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembersrvacct', 'serveraccount', $username);
+}
+sub nickisclanmember {
+  my ($username) = @_;
+  return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembernick', 'nick', $username);
 }
 
 sub settimer {
@@ -611,7 +625,7 @@ sub debuginfo {
 sub handlectcp {
   my ($self, $target, $tag, $msg, $type, $blah) = @_;
   my $respond = 0;
-  logit("handlectcp(self, $target, $tag, $msg, $type, $blah)");
+  logit("handlectcp(self, $target, $tag, $msg, $type, $blah)") if $debug{ctcp};
   updatepingtimes($target, 'ctcp', $tag);
   if ($type eq 'NOTICE') { # The CTCP message was in a channel.  Only respond if sender is a master.
     $respond = ($irc{master}{$target}) ? 1 : 0;
@@ -620,10 +634,11 @@ sub handlectcp {
   }
   $respond++ if $irc{master}{$target}; # If the sender is our master, we may respond to some tags we otherwise would not.
   my $response = undef;
-  logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg");# if $debug{ctcp};
+  logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg") if $debug{ctcp};
   if ($tag eq 'VERSION') {
     my $perlver  = ($] ge '5.006') ? (sprintf "%vd", $^V) : $];
     $response = qq[$devname $version / Perl $perlver];
+    logit("Formulated CTCP VERSION response: $response") if $debug{ctcp};
   } elsif ($tag eq 'TIME') {
     my $dt       = DateTime->now(@tz);
     $response = $dt->year() . ' ' . $dt->month_abbr() . ' ' . $dt->mday() . ' at ' . ampmtime($dt) . ' ' . friendlytz($dt);
@@ -767,44 +782,36 @@ sub handlemessage {
     $subcommand ||= 'list';
     if ($irc{okdom}{$howtorespond}) {
       if ($subcommand eq 'list') {
-        # TODO: purge $irc{demi} (or convert it into purely a cache) and use a database table.
-        say((join " ", @{$irc{demi}}),
+        my $list = join "; ", map {
+          my $midr = $_;
+          my @nick = map { $$_{nick} } sort { $$a{prio} <=> $$b{prio}
+                                            } findrecord('clanmembernick', 'memberid', $$midr{id});
+          my @srva = map { $$_{serveraccount} } findrecord('clanmembersrvacct', 'memberid', $$midr{id});
+          my @alias = grep { $_ ne $$midr{tourneyaccount} } uniq(@nick, @srva);
+          $$midr{tourneyaccount} . ((scalar @alias) ? (qq[ (aka: ] . (join ", ", @alias) . qq[)]) : '');
+        } findrecord('clanmemberid', 'clanname', $ourclan, year => DateTime->now(@tz)->year());
+        say(qq[$ourclan members: $list], channel => $howtorespond, sender => $sender, fallbackto => 'private');
+      } elsif ($subcommand eq 'alias') {
+        say("Adding IRC nick aliases for clan members is a planned feature.",
             channel => $howtorespond, sender => $sender, fallbackto => 'private');
-      } elsif ($subcommand eq 'add') {
-        push @{$irc{demi}}, $target;
-        %demilichen = map {
-          my $dl = $_;
-          ($dl => 1, (lc $dl) => 1)
-        } @{$irc{demi}};
-        say("Added $target to my list of $irc{clan}",
+      } elsif ($subcommand eq 'scrape') { # TODO
+        say("Scraping the tournament site for new clan members and server accounts is a planned feature.",
             channel => $howtorespond, sender => $sender, fallbackto => 'private');
-      } elsif ($subcommand eq 'subtract') {
-        $irc{demi} = [grep { $_ ne $target } @{$irc{demi}}];
-        %demilichen = map {
-          my $dl = $_;
-          ($dl => 1, (lc $dl) => 1)
-        } @{$irc{demi}};
-        say("Removed $target from my list of $irc{clan}",
+      } elsif ($subcommand eq 'add') { # TODO
+        say("Adding members to the clan is a planned feature.",
+            channel => $howtorespond, sender => $sender, fallbackto => 'private');
+      } elsif ($subcommand eq 'subtract') { # TODO
+        say("Removing members from the clan is a planned feature.",
             channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }}
-  } elsif ($text =~ /^!anthem/) { # TODO: generalize this in the same way as !trophies and !deaths
-    my $anthemfile = qq[nethack-$irc{clan}-anthem.png];
-    if (-e ('/var/www/nethack-stuff/' . $anthemfile)) {
-      say("http://74.135.83.0:8018/nethack-stuff/$anthemfile",
-          channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
-    }
   } elsif ($text =~ /^!gt\s*(.*)/) {
     my ($member) = ($1);
-    %demilichen = map {
-          my $dl = $_;
-          ($dl => 1, (lc $dl) => 1)
-        } @{$irc{demi}};
-    if ($demilichen{$member}) { # TODO: use ganbatte()
+    if (nickisclanmember($member) or playerisclanmember($member)) {
       my $whoever = join " ", map { ucfirst lc $_ } split /\s+/, $member;
-      say("Go $whoever!",
+      say("Go $whoever!  " . ganbatte($whoever, "!gt"),
           channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
     } else {
-      my $teamname = ucfirst $irc{clan};
+      my $teamname = ucfirst $ourclan;
       say("Go Team $teamname!",
           channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
     }
@@ -1290,10 +1297,6 @@ sub handlemessage {
       do $guts;
       do $biffvars;
       do $teacode;
-      %demilichen = map {
-        my $dl = $_;
-        ($dl => 1, (lc $dl) => 1)
-      } @{$irc{demi}};
       do $watchrod;
       logit("Reload complete.", 1);
     }

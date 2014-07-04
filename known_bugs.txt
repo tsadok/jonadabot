@@ -6,8 +6,25 @@ Known bugs:
    loadconfigfromdb function that should also be used at startup,
    and maybe have options to reload extrasubs and regexes
    and possibly redo the filewatch pipes.
+ * The targetting on !zap is buggy: it never picks the specified target.
+   I suspect this may be because the check to see if the person has been
+   seen in the channel is buggy, but that's a guess.
+ * Responding to CTCP requests doesn't work.  This is particularly
+   annoying with regards to VERSION, because people who don't know
+   anything about the bot wouldn't know about its !about trigger
+   yet should be able to get at least basic information anyway.
+ * After sending a /msg to the operator about a sibling bot, it
+   will continue to do so every siblingminutes minutes until
+   communications are re-established.  I know why this happens,
+   but it is not ideal behavior.  After sending a /msg once,
+   the bot should wait until it hears from the operator again
+   before sending any further reminders.  Fixing this probably
+   requires storing an additional variable in the database.
+ * When friendlytime() adds UTC hour and minute in parentheses,
+   the minute is not zero-padded to two digits.  It should be.
 
 Features Wanted:
+ * It should be possible to configure permanent bcc for !sms
  * !notifications should have an option to go ahead and send up to maxlines notifications now.
  * When biff reports a header (e.g., Subject), it should probably prefix it with box and number.
    This could be a preference, but it becomes important when there's network lag and you are
@@ -26,6 +43,5 @@ Features Wanted:
  * Add a watch regex for demogorgon's "killed the ghost of"
      that only does anything if the ghost is from your clan.
  * Play a scrambled word game.
- * Implement recurring alarms.
+ * Allow recurring alarms to be set (without manually inserting database records).
  * Basic numerical calculations.
- * !zap

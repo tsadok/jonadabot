@@ -3,13 +3,12 @@
 print "Filewatch Debugging Level $debug{filewatch}\n" if $debug{filewatch};
 
 sub watchlogfile {
-  my ($demi, $log, $bwhash) = @_;
-  my %demilichen = %$demi;
+  my ($log, $bwhash) = @_;
   my $pipe = $$bwhash{$$log{id}}{pipe};
   my $line = <$pipe>;
   my @watch = grep { not $$_{flags} =~ /X/ } findrecord("logfilewatch", "logfile", $$log{id});
   chomp $line;
-  logit("watchlogfile(..., $$log{mnemonic}, ...): $line") if $debug{filewatch} > 1;
+  logit("watchlogfile($$log{mnemonic}, ...): $line") if $debug{filewatch} > 1;
   logit("" . @watch . " watch records found", 2) if $debug{filewatch} > 2;
   my ($whenseen, $expires, $note);
   for my $watch (@watch) {
