@@ -523,38 +523,6 @@ sub getclanmemberlist {
              );
 }
 
-sub vladsbane {
-  my @buc  = (qw(blessed blessed uncursed cursed cursed cursed), '');
-  my @rust = ('rusty', 'very rusty', 'thoroughly rusty', 'rustproof', '');
-  my @corr = ('corroded', 'very corroded', 'thoroughly corroded', '', '');
-  my @burn = ('burnt', 'very burnt', 'fireproof', '', '');
-  my @ench = ('', '', '', '', '', '', '', '+0', '+0', '+0', '+0',
-              '+1', '+1', '+1', '+1', '-1', '-1', '-1',
-              '+2', '+3', '+5', '+7', '-2', '-3', '-4', '-5');
-  my @item =
-    (
-     ['dagger',     [@buc], [@rust, @corr, ''], [@ench], ['', 'orcish', 'crude'], ],
-     ['club',       [@buc], [@rust, @burn, ''], ['thonged', '', '', ''], ],
-     ["scalpel",    [@buc], [@rust, @corr, ''], [@ench], ],
-     ['tin opener', [@buc], [@rust, @corr, ''], ],
-     ["hands",      [],     ['bare', 'gloved'], ],
-     ['potion',     [@buc], ['diluted', ''], [qw(yellow milky smoky clear fizzy effervescent)], ],
-     ['icebox',     [@buc], [@rust, '', '', '', '', ''], [(('') x 15), 'full of corpses', 'full of booze'], ],
-     ['stone',      [@buc], [qw(gray gray gray gray whitegem greengem redgem bluegem blackgem luck load flint)]],
-    );
-  my @adj = @{$item[rand @item]};
-  my $baseitem = shift @adj;
-  my $answer = join ' ', grep { $_ } ((map { my @l = @{$_}; $l[rand @l] } @adj), $baseitem);
-  $answer =~ s/diluted clear/clear/;
-  $answer =~ s/(luck|load) (stone)/$1$2/;
-  $answer =~ s/gem / gem/;
-  if ((rand(30) > 28) and (not $answer =~ /hands|icebox/)) {
-    $num = 2 + int rand int rand int rand 5;
-    $answer = $num . " " . $answer . "s";
-  }
-  return $answer;
-}
-
 sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, only
                # unprivileged triggers (ones anyone can use) are documented here.
                # Bot operators and masters are expected to have a copy of the source.
@@ -771,12 +739,6 @@ sub handlemessage {
     my ($userdata) = ($1);
     my ($extradata) = ($irc{master}{$sender} ? (qq[ $$ pt=] . $irc{pingtime}->hms()) : '');
     say("!pong$extradata $userdata", channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
-  } elsif ($text =~ /^!vlads?bane/) {
-    # TODO: generalize this sort of thing (probably also !tea, etc.) by listing valid
-    #       trigger words in the database and then defining the subroutines for them
-    #       in jonadabot_triggers.pl as a hash of coderefs or somesuch; it should
-    #       then be possible to reload jonadabot_triggers.pl without restarting.
-    say(vladsbane(), channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
   } elsif ($text =~ /^!members?\s*(\w*)\s*(\w*)/) {
     my ($subcommand, $target) = ($1, $2);
     $subcommand ||= 'list';
@@ -849,14 +811,17 @@ sub handlemessage {
       say($item,
           channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
-  } elsif ($text =~ /^!show(?:pref)?\s*(\w+)/) {
+  } elsif ($text =~ /^!show(?:pref)?\s*(\w*)/) {
     my ($var) = ($1);
-    my $value = getircuserpref($sender, $var);
-    say("$var == $value", channel => 'private', sender => $sender);
+    if ($var) {
+      my $value = getircuserpref($sender, $var);
+      say("$var == $value", channel => 'private', sender => $sender);
+    } else {
+      my @possible = uniq('timezone', getconfigvar($cfgprofile, 'userpref'));
+      say("Prefs you can set: " . (join ", ", @possible),
+          channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    }
   } elsif ($text =~ /^!set(?:pref)?\s*(\w+)\s+(.*)/) {
-    # TODO: add a list of valid pref variable names to the database and support setting values for any pref listed there.
-    #       but note that for security reasons timezone needs to remain special-cased.
-    # TODO: support /listing/ your own set prefs (by /msg only, not in channel).
     my ($var, $value) = ($1, $2);
     chomp $value; # Not sure if this is necessary.
     logit("$sender wants to set $var preference to $value") if $debug{preference};
