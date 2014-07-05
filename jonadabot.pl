@@ -73,7 +73,7 @@ our $startuptime      = DateTime->now(@tz);
 
 my @stage = ("'Aleph", qw(Beth Gimmel Daleth He Waw Zayin Heth Teth Yodh Kaph Lamedh Mem Nun Samekh), "`Ayin", qw(Pe Tsadhe Qoph Resh Sin Shin Taw));
 warn "Stage " . (shift @stage);
-our (%pop3, %watchregex, %sms, %smtp); # TODO: some of these hashes will eventually all be ripped out in favor of database tables (but not the regexes).
+our (%watchregex); # Populated with regexes by jonadabot_regexes.pl, which each installation must supply (there's a sample).
 do $utilsubs;  warn "Stage " . (shift @stage) . " (did utilsubs)";
 do $dbcode;    warn "Stage " . (shift @stage) . " (did dbcode)";
 do $regexen;   warn "Stage " . (shift @stage) . " (did regexes)";
