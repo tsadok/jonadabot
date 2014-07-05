@@ -713,28 +713,6 @@ sub handlemessage {
     } else {
       push @scriptqueue, ["perl", ["/b4/perl/nethack-junethack-trophy-list-compiler.pl", @extraarg], $sayresults, \@extraarg];
     }
-  } elsif ($text =~ /^!(hsn|lastgame|rc|dumplog|players|gamesby|scores|bugs|asc|ascension|lg|grepsrc|whereis|streak|save)\s*(.*)/) {
-    # I wanted to add !wl to this list, but Rodney doesn't respond to it in /msg
-    # TODO: generalize this by allowing info-source bots and triggers they can handle to
-    #       be listed in the DB.  Note that to be useful the bot must trigger on a /msg
-    #       and respond in kind.  If the command has to be given in a channel, we don't
-    #       want to respond to it by issuing it, because that could cause loops and
-    #       flooding and general unpleasantness.  If all we do is /msg a bot and route
-    #       the answer to a channel, the worst that happens is duplicate responses.
-    #       That's still not good, of course:  we shouldn't be proxying for a bot that
-    #       frequents the same channel we're in; if we are it means we're misconfigured.
-    #       But only using /msg to get the response should at least avoid loops.
-    my ($command, $args) = ($1, $2);
-    say($text, channel => 'private', sender => 'Rodney'); {
-      # This isn't perfect.  In the event of lag, when multiple destination channels are
-      # involved, responses to multiple proxied commands can end up all being echoed to
-      # channels that only some of them were supposed to be echoed to (and note that
-      # private /msg counts as a channel).  For small installations however this is
-      # unlikely, unless one of the bots involved is lagging rather noticeably.
-      $irc{echo}{Rodney}{private}{count}++;
-      $irc{echo}{Rodney}{private}{channels} = [ uniq($howtorespond, @{$irc{echo}{Rodney}{private}{channels}}) ];
-      push @{$irc{echo}{Rodney}{private}{fallback}}, $sender;
-    }
   } elsif ($text =~ /^!ping\s*?( ?\w{0,20})/) {
     my ($userdata) = ($1);
     my ($extradata) = ($irc{master}{$sender} ? (qq[ $$ pt=] . $irc{pingtime}->hms()) : '');
@@ -1272,7 +1250,27 @@ sub handlemessage {
         if (($irc{okdom}{$howtorespond}) or (not ($$t{flags} =~ /C/))
             or ($howtorespond eq 'private')) { # C means respond in channel even if not okdom
           if ($irc{master}{$sender} or not $$t{flags} =~ /M/) { # M means master-only bottrigger
-            if ($$t{flags} =~ /R/) { # R means Routine bottrigger, as opposed to flat text
+            if ($$t{flags} =~ /P/) { # P means Proxied bottrigger, i.e., we ask another bot.
+              # Note that the other bot must trigger on a /msg and respond in kind.  If
+              # the command has to be given in a channel, we don't want to respond to it
+              # by issuing it, because that could cause loops and flooding and general
+              # unpleasantness.  If all we do is /msg a bot and route the answer to a
+              # channel, the worst that happens is duplicate responses.  That's still not
+              # good, of course:  we shouldn't be proxying for a bot that frequents the
+              # same channel we're in; if we are it means we're misconfigured.  But only
+              # using /msg to get the response should at least avoid loops, so we do that:
+              say($text, channel => 'private', sender => $$t{answer});
+              $irc{echo}{$$t{answer}}{private}{count}++;
+              $irc{echo}{$$t{answer}}{private}{channels} = [ uniq($howtorespond, @{$irc{echo}{$$t{answer}}{private}{channels}}) ];
+              push @{$irc{echo}{$$t{answer}}{private}{fallback}}, $sender;
+              # The above isn't perfect.  In the event of lag, when multiple destination
+              # channels are involved, responses to multiple proxied commands can end up
+              # all being echoed to channels that only some of them were supposed to be
+              # echoed to (and note that private /msg counts as a channel).  Likewise,
+              # the fallback values can also get mixed up.  For small installations
+              # however this is unlikely, unless one of the bots involved is lagging
+              # rather noticeably or becomes entirely unreachable (e.g., netsplit).
+            } elsif ($$t{flags} =~ /R/) { # R means Routine bottrigger, as opposed to flat text
               if ($routine{$$t{answer}}) {
                 my $response = $routine{$$t{answer}}->($$t{bottrigger}, channel => $howtorespond, text => $text, sender => $sender);
                 # TODO: pass more args there to allow routines more flexibility in what they can do.
@@ -1298,10 +1296,20 @@ sub handlemessage {
         logit("Not responding to custom bottrigger $$t{bottrigger} in non-included channel $howtorespond") if $debug{bottrigger};
       }
     }
-  } elsif ($irc{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots:
+  } elsif ($irc{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots.
+    # Note that $howtorespond SHOULD always be private for these, because that's the only way we proxy them.
     my $fallback = shift @{$irc{echo}{$sender}{$howtorespond}{fallback}};
     for my $chan (@{$irc{echo}{$sender}{$howtorespond}{channels}}) {
       say(qq[$sender says: $text], channel => $chan, sender => $fallback, fallbackto => 'private');
+    }
+    # TODO: because of the imperfections mentioned above (where these variables are set),
+    # there really should be a trigger that clears these variables out on request, so
+    # that our bot doesn't have to be restarted just because e.g. Rodney has been offline.
+    $irc{echo}{$sender}{$howtorespond}{count}--;
+    if ($irc{echo}{$sender}{$howtorespond}{count} <= 0) {
+      $irc{echo}{$sender}{$howtorespond}{count} = 0;
+      $irc{echo}{$sender}{$howtorespond}{channels} = [];
+      $irc{echo}{$sender}{$howtorespond}{fallback} = [];
     }
   }
   # Finally, check to see if we have any memoranda for the person who just spoke:
