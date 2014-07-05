@@ -29,60 +29,70 @@ for my $dflt (getconfigvar($cfgprofile, "debug")) {
   $debug{$k} = $v || $debug{$k};
 }
 
-
 %prefdefault = ( # This is the _default_ default, if the operator doesn't set a default in the DB.
                 timezone => 'UTC',
                );
-for my $k (keys %prefdefault) { # The default set in the database overrides the hardcoded one:
-  $prefdefault{$k} = getconfigvar($cfgprofile, "default$k") || $prefdefault{$k};
-} # And of course that in turn is overridden by user preference, on a per-user basis.
+sub loadprefdefaults {
+  for my $k (keys %prefdefault) { # The default set in the database overrides the hardcoded one:
+    $prefdefault{$k} = getconfigvar($cfgprofile, "default$k") || $prefdefault{$k};
+  } # And of course that in turn is overridden by user preference, on a per-user basis.
+}
+loadprefdefaults();
 
 my $defaultusername = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
-my $ourclan = getconfigvar($cfgprofile, 'clan') || 'demilichens'; # used more than one place below.
+my $ourclan;
 %irc = (
-        server  => getconfigvar($cfgprofile, 'ircserver') || 'irc.freenode.net',
-        port    => getconfigvar($cfgprofile, 'ircserverport') || 6667,
-        nick    => [ getconfigvar($cfgprofile, 'ircnick'), $defaultusername ],
-        nsrv    => getconfigvar($cfgprofile, 'ircnickserv') || 'NickServ',
-        user    => getconfigvar($cfgprofile, 'ircusername') || $defaultusername,
-        real    => ("" . getconfigvar($cfgprofile, 'ircrealname') || "anonymous ircbot operator") . ", represented by $devname",
-        pass    => getconfigvar($cfgprofile, 'ircpassword') || 'm2RTLVG8iwm3onyNzFXSu0kOYFtdlGB5Nct',
-        email   => getconfigvar($cfgprofile, 'ircemailaddress'),
-        clan    => $ourclan,
-        demi    => [ getclanmemberlist($ourclan) ],
-        chan    => ['#bot-test',
-                   #'#bot-testing',
-                   #'#bottesting',
-                   getconfigvar($cfgprofile, 'ircchannel'),
-                  ],
         channel => +{}, # populated only when channels are joined
-        okdom   => +{ map { $_ => 1 } (getconfigvar($cfgprofile, 'ircchanokdom'), 'private')}, # channels it's ok to dominate
-        silent  => +{ map { $_ => 1 } (getconfigvar($cfgprofile, 'ircchansilent'), '#freenode')}, # exact opposite, channels to shut up in
-        oper    => getconfigvarordie($cfgprofile, 'defaultoperator'), # Primary nick for primary bot operator.
-        opers   => [uniq(getconfigvar($cfgprofile, 'defaultoperator'),
-                         getconfigvar($cfgprofile, 'operator')),
-                    # All active GROUPed nicks for primary bot operator.
-                    # Currently this doesn't do much, but in a
-                    # future version the bot will look for you and
-                    # find which nick you are using if you are
-                    # online.
-                   ],
-        master  => +{ map { $_ => 1 }
-                      (getconfigvar($cfgprofile, 'master')
-                       # Any nick listed as master can issue any
-                       # bot command, including privileged ones.
-                       # Don't list unregistered nicks as master,
-                       # for obvious reasons.  Nicks can be listed
-                       # as master without being the operator, and
-                       # vice versa.
-                      ),
-                    },
-        maxlines => getconfigvar($cfgprofile, 'maxlines') || 12,
-        pinglims => [getconfigvar($cfgprofile, 'pingtimelimit')],
-        pingtime => DateTime->now( @tz ),
-        pingbots => [getconfigvar($cfgprofile, 'pingbot')], # Bots that will respond to !ping in a private /msg
-        siblings => [getconfigvar($cfgprofile, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
        );
+
+sub loadconfig {
+  $ourclan = getconfigvar($cfgprofile, 'clan') || 'demilichens';
+  %irc = (
+          %irc, # preserve things that aren't specifically loaded, e.g., $irc{channel}
+          server  => getconfigvar($cfgprofile, 'ircserver') || 'irc.freenode.net',
+          port    => getconfigvar($cfgprofile, 'ircserverport') || 6667,
+          nick    => [ getconfigvar($cfgprofile, 'ircnick'), $defaultusername ],
+          nsrv    => getconfigvar($cfgprofile, 'ircnickserv') || 'NickServ',
+          user    => getconfigvar($cfgprofile, 'ircusername') || $defaultusername,
+          real    => ("" . getconfigvar($cfgprofile, 'ircrealname') || "anonymous ircbot operator") . ", represented by $devname",
+          pass    => getconfigvar($cfgprofile, 'ircpassword') || 'm2RTLVG8iwm3onyNzFXSu0kOYFtdlGB5Nct',
+          email   => getconfigvar($cfgprofile, 'ircemailaddress'),
+          clan    => $ourclan,
+          demi    => [ getclanmemberlist($ourclan) ],
+          chan    => ['#bot-test',
+                      #'#bot-testing',
+                      #'#bottesting',
+                      getconfigvar($cfgprofile, 'ircchannel'),
+                     ],
+          okdom   => +{ map { $_ => 1 } (getconfigvar($cfgprofile, 'ircchanokdom'), 'private')}, # channels it's ok to dominate
+          silent  => +{ map { $_ => 1 } (getconfigvar($cfgprofile, 'ircchansilent'), '#freenode')}, # exact opposite, channels to shut up in
+          oper    => getconfigvarordie($cfgprofile, 'defaultoperator'), # Primary nick for primary bot operator.
+          opers   => [uniq(getconfigvar($cfgprofile, 'defaultoperator'),
+                           getconfigvar($cfgprofile, 'operator')),
+                      # All active GROUPed nicks for primary bot operator.
+                      # Currently this doesn't do much, but in a
+                      # future version the bot will look for you and
+                      # find which nick you are using if you are
+                      # online.
+                     ],
+          master  => +{ map { $_ => 1 }
+                        (getconfigvar($cfgprofile, 'master')
+                         # Any nick listed as master can issue any
+                         # bot command, including privileged ones.
+                         # Don't list unregistered nicks as master,
+                         # for obvious reasons.  Nicks can be listed
+                         # as master without being the operator, and
+                         # vice versa.
+                        ),
+                      },
+          maxlines => getconfigvar($cfgprofile, 'maxlines') || 12,
+          pinglims => [getconfigvar($cfgprofile, 'pingtimelimit')],
+          pingtime => DateTime->now( @tz ),
+          pingbots => [getconfigvar($cfgprofile, 'pingbot')], # Bots that will respond to !ping in a private /msg
+          siblings => [getconfigvar($cfgprofile, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
+         );
+}
+loadconfig();
 
 our @notification = (); # TODO: store notifications in the database and purge this variable.
 our @scriptqueue  = (); # This one can stay, because it gets emptied quickly.
@@ -356,8 +366,8 @@ sub checkpingtimes {
     push @bot, $bot;
   }
   logit("Past all ping limits.  Restarting...");
-  exec "jonadabot.pl";
-  logit("exec returned (checkpingtimes)", 1);
+  #exec "jonadabot.pl"; # exec doesn't work from inside an AnyEvent callback, a limitation of the framework.
+  #logit("exec returned (checkpingtimes)", 1);
   system("kill", $$);
   sleep 3;
   system("kill", "-9", $$);
@@ -367,8 +377,8 @@ sub checkpingtimes {
 
 sub greeting { # punctuation may be added automatically, so don't include it
   my @g = (# Basic English:
-           "Hi", "Hi", "Hello", "Hello", "Howdy",
-           "Welcome", "Greetings",
+           "Hi", "Hi", "Hello", "Hello", "Howdy", "Hi", "Hello", "Hi", "Hello",
+           "Welcome", "Greetings", "Hello", "Hi", "Hi", "Hello", "Hi", "Hello",
            # Common foreign ones:
            "Bonjour", "Buenos dias", "Aloha", "Hallo", "Hola",
            # Exotic English:
@@ -1228,19 +1238,44 @@ sub handlemessage {
     delete $irc{channel}{$ch};
   } elsif ($text =~ /^!reload/ and $irc{master}{$sender}) {
     $|=1;
-    if ($text =~ /^!reload full/i) { # TODO: Test that this actually works.
+    if ($text =~ /^!reload full/i) {
       logit("FULL reload at the request of $sender", 1);
-      exec "perl", $0;
-      logit("exec returned (!reload)", 1);
+      # This only works in the intended fashion when the bot is running inside a
+      # run-on-exit loop, such as the provided jonadabot-keeprunning.sh
       system("kill", $$);
       exit 2;
+    } elsif ($text =~ /^!reload regex/) {
+      logit("Reloading regexen at the request of $sender: $regexen");
+      do $regexen;
+      say("Regular expressions reloaded.", channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    } elsif ($text =~ /^!reload (?:extra)?\s*(?:sub|routine)/) {
+      logit("Reloading extrasubs at the request of $sender: $extrasubs");
+      do $extrasubs;
+      say("Custom routines (extrasubs) reloaded.", channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    } elsif ($text =~ /^!reload (?:pref|default)/) {
+      logit("Reloading pref defaults at the request of $sender");
+      loadprefdefaults();
+      say("Pref defaults reloaded.",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    } elsif ($text =~ /^!reload config/) {
+      logit("Reloading config at the request of $sender");
+      loadconfig();
+      say("Basic configuration reloaded.",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    } elsif ($text =~ /^!reload pipes/) {
+      # TODO:
+      say("Re-initializing file watch pipes is an intended feature but has not yet been implemented, sorry.",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } else { # TODO: re-test how well this works in 006, and clean up any non-working bits.
-      logit("Reloading components at the request of $sender", 1);
+      logit("Reloading multiple components at the request of $sender", 1);
       do $dbcode;
-      do $guts;
-      do $biffvars;
+      do $guts; # This, in particular, may not work as intended.
       do $teacode;
-      do $watchrod;
+      do $watchlog;
+      do $regexen;
+      do $extrasubs;
+      loadprefdefaults();
+      loadconfig();
       logit("Reload complete.", 1);
     }
   } elsif ($text =~ /^!(\w+)/ and (@rec = findrecord("bottrigger", "bottrigger", $1, "enabled", 1))) {
