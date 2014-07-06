@@ -315,6 +315,8 @@ my @var = (
            ['ircchanokdom'         => [], "IRC channel it is alright to dominate (be VERY sure you have permission from the ops)"],
            ['clan'                 => '', "Name of junethack tournament clan the IRC bot is assisting, if any"],
            ['wordfile'             => ["/usr/share/dict/words"], "Text file, one word or phrase per line, that can be used for games like hangman"],
+           ['pubdirpath'           => '/var/www/jonadabot', "Filesystem path to a directory where the bot can publish files."],
+           ['pubdiruri'            => 'http://www.example.com/jonadabot', "Public URL pointing to the same directory as pubdirpath"],
           );
 my $questionsasked = 0;
 for my $var (@var) {
@@ -338,6 +340,18 @@ for my $var (@var) {
     } else {
       my $dfltnote = $default ? qq[ (default: $default)] : '';
       addrecord('config', +{ cfgprofile => $cfgprofile, varname => $varname, enabled => 1, value   => (askuser("$question$dfltnote") || $default) });
+    }
+  }
+}
+if (-e "bot-help.html") { # we appear to have been run from the jonadabot dir
+  for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
+    my $dest = catfile($$pubdir{value}, "bot-help.html");
+    if (yesno("Copy sample bot-help.html to $dest?")) {
+      system("cp", "bot-help.html", $dest);
+      my $cssdest = catfile($$pubdir{value}, "arsinoe.css");
+      if (yesno("Also copy sample stylesheet to $cssdest?")) {
+        system("cp", "arsinoe.css", $cssdest);
+      }
     }
   }
 }
