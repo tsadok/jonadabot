@@ -606,7 +606,7 @@ sub handlectcp {
   my ($self, $sender, $target, $tag, $msg, $type) = @_;
   my $respond = 0;
   logit("handlectcp(self, $sender, $target, $tag, $msg, $type)") if $debug{ctcp};
-  updatepingtimes($target, 'ctcp', $tag);
+  updatepingtimes($sender, 'ctcp', $tag);
   if ($type eq 'NOTICE') { # The CTCP message was in a channel.  Only respond if sender is a master.
     $respond = ($irc{master}{$target}) ? 1 : 0;
   } elsif ($type eq 'PRIVMSG') { # The CTCP message was private.  Respond privately (if it's a tag we respond to).
@@ -617,7 +617,7 @@ sub handlectcp {
   logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg") if $debug{ctcp};
   if ($tag eq 'VERSION') {
     my $perlver  = ($] ge '5.006') ? (sprintf "%vd", $^V) : $];
-    $response = qq[$devname $version / Perl $perlver];
+    $response = qq[$devname $version / Perl $perlver / See $gitpage];
     logit("Formulated CTCP VERSION response: $response") if $debug{ctcp};
   } elsif ($tag eq 'TIME') {
     my $dt       = DateTime->now(@tz);
@@ -634,7 +634,7 @@ sub handlectcp {
   } # TODO: DCC support might be a useful way to deliver things like backscroll.
   logit("handlectcp: respond $respond, response $response", 3) if $debug{ctcp};
   if ($respond and $response) {
-    say(encode_ctcp($tag, $response), channel => 'private', sender => $target);
+    $irc->send_srv(NOTICE => $sender, qq[$tag $response]);
   }
 }
 
@@ -980,7 +980,7 @@ sub handlemessage {
       } elsif (lc($$alarm{nick}) ne lc $sender) {
         say("Not your alarm: $num", channel => 'private', sender => $sender);
       } elsif ($rest =~ /snooze\s*(\d*)\s*(minutes|hours|days)?/) {
-        my ($num, $unit); = ($1, $2);
+        my ($num, $unit) = ($1, $2);
         $num  ||= 10;
         $unit ||= 'minutes';
         my $snoozedt = DateTime->now( time_zone => "UTC" )->add( $unit => $num );
