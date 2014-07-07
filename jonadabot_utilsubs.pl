@@ -18,4 +18,13 @@ sub uniq {
   return grep { not $seen{$_}++ } @_;
 }
 
+sub max {
+  my $max = undef;
+  for my $val (@_) {
+    if ((not defined $max) or ($max < $val)) {
+      $max = $val;
+    }}
+  return $max;
+}
+
 42;

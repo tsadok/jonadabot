@@ -257,7 +257,7 @@ sub sendqueuedmail {
   warn "No nick for message $$msg{id}" if not $$msg{nick};
   if (sendmail(%mail)) {
     $$msg{dequeued} = DateTime::Format::ForDB(DateTime->now(@tz));
-    say("Email message #" . $$msg{id} . " sent to $$msg{to}.",
+    say("Email message #" . $$msg{id} . " sent to $$msg{tofield}.",
         channel => 'private', sender => $$msg{nick});
   } else {
     logit("SMTP error: $Mail::Sendmail::error");
@@ -536,6 +536,8 @@ sub getclanmemberlist {
 sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, only
                # unprivileged triggers (ones anyone can use) are documented here.
                # Bot operators and masters are expected to have a copy of the source.
+  # Additionally, helpinfo() is now deprecated in favor of the helpurl config variable.
+  # To that end, a sample bot-help.html file is included with the distribution.
   my ($item) = @_;
   if ($item eq '') {
     return "For more info: !help topic, where topic is deaths, gt, member, message, rng, seen, tea, tell, time, trophies";
@@ -558,7 +560,7 @@ sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, on
   } elsif ($item eq 'tell') {
     return "!tell whoever Blah blah blah blah blah.";
   } elsif ($item eq 'time') {
-    return "!time currently reports UTC.";
+    return "!time reports the current time in your chosen timezone (see !set) and in UTC.";
     #return "!time returns the current time in your timezone, see !help set";
   } elsif ($item eq 'trophies') {
     return qq[!trophies updates our "trophies needed" page and gives the URL when the update is complete.];
@@ -650,6 +652,29 @@ sub handlemessage {
   $irc{channel}{lc $howtorespond} ||= +{};
   logit("Adding $sender to recent activity list for channel $howtorespond");
   push @{$irc{channel}{lc $howtorespond}{recentactivity}}, $sender;
+  my $bslimit = max(getconfigvar($cfgprofile, "backscroll$howtorespond"));
+  logit("backscroll limit: $bslimit") if $debug{backscroll} > 6;
+  if ($bslimit > 0) {
+    logit("Saving backscroll for channel $howtorespond") if $debug{backscroll} > 5;
+    my $ptr = findrecord('config', cfgprofile => $cfgprofile, varname => "bsi_$howtorespond", enabled => 1 )
+      || +{ cfgprofile => $cfgprofile, varname => "bsi_$howtorespond", enabled => 1, value => -1 };
+    $$ptr{value} = (($$ptr{value} + 1) % $bslimit);
+    my $bsr = findrecord("backscroll", channel => $howtorespond, number => $$ptr{value})
+      || +{ channel => $howtorespond, number => $$ptr{value} };
+    $$bsr{whensaid} = DateTime::Format::ForDB($now);
+    $$bsr{speaker}  = $sender;
+    $$bsr{message}  = $text;
+    if ($$bsr{id}) {
+      updaterecord("backscroll", $bsr);
+    } else {
+      addrecord("backscroll", $bsr);
+    }
+    if ($$ptr{id}) {
+      updaterecord("config", $ptr);
+    } else {
+      addrecord("config", $ptr);
+    }
+  }
 
   while (20 < scalar @{$irc{channel}{lc $howtorespond}{recentactivity}}) { # Not-so-recent
      shift @{$irc{channel}{lc $howtorespond}{recentactivity}}
@@ -1203,13 +1228,47 @@ sub handlemessage {
     my $n = scalar @notification;
     say(qq[$n notification(s) pending], channel => 'private', sender => $sender);
     processnotification();
-  } elsif ($text =~ /^backscroll\s*([#]+\S+)/) {
-    # TODO:  answer !backscroll [channel] [number] [timeunit|lines]
+  } elsif ($text =~ /^backscroll\s*([#]+\S+)?\s*(\d*)/i) {
+    my ($thechan, $linecount) = ($1, $2);
+    $thechan ||= $howtorespond;
     # (The intention here is to allow a person who just connected to get what they missed.)
     # (The bot could collect the info itself or use an irssi logfile if one is available.)
-    # (It would only ever be sent via private /msg of course.)
-    say(qq[Yeah, $devname has been meaning to implement a !backscroll command...],
-        channel => 'private', sender => $sender);
+    # (It would of course NEVER EVER be sent en masse to a channel, ever.)
+    my $limit = max(getconfigvar($cfgprofile, "backscroll$thechan"));
+    if ($limit > 0) {
+      my $dirpath = getconfigvar($cfgprofile, "pubdirpath");
+      my $diruri  = getconfigvar($cfgprofile, "pubdiruri");
+      if ($dirpath and $diruri) {
+        # TODO: if linecount is not specified, try to figure out what $sender missed.
+        $linecount ||= $limit;
+        my $ptr = findrecord("config", cfgprofile => $cfgprofile, varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
+        my $fn  = "backscroll${thechan}.html";
+        $fn =~ s/\W+/_/g;
+        my $displaytz = getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz;
+        open HTML, ">", catfile($dirpath, $fn);
+        print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
+        for my $num (1 .. $linecount) {
+          my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
+          my $r  = findrecord("backscroll", channel => $thechan, number => $i);
+          if (ref $r) {
+            my $time    = friendlytime(DateTime::From::MySQL($$r{whensaid}), $displaytz, 'hms');
+            my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
+            my $speaker = encode_entities($speaker);
+            my $message = encode_entities($message);
+            print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
+          }
+        }
+        print HTML qq[</tbody></table>\n</body></html>];
+        say(catfile($diruri, $fn),
+            channel => $howtorespond, fallbackto => 'private', sender => $sender);
+      } else {
+        say(qq[$irc{oper} hasn't set me up a pubdir.  (Perhaps up to $maxlines lines could be delivered via /msg, but that isn't implemented yet.)],
+            channel => $howtorespond, fallbackto => 'private', sender => $sender);
+      }
+    } else {
+      say(qq[Backscroll is not enabled for channel $thechan  (Permission from channel ops is needed...)  Sorry.],
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    }
   } elsif ($text =~ /^!shutdown/ and $irc{master}{$sender}) {
     # TODO: implement this.  Just doing exit 0 does not work, because of AnyEvent.
     #  logit("Shutdown at the request of $sender", 1);
@@ -1368,6 +1427,25 @@ sub handlemessage {
   }
 }
 
+sub ircnickcolor {
+  my ($speaker, $context, $audience) = @_;
+  if ($speaker eq $audience)  { return "#FFFFFF"; }
+  if ($speaker eq $irc{nick}) { return "#FF4444"; }
+  if ($speaker eq $irc{oper}) { return "#AA1111"; }
+  if ($irc{master}{$speaker}) { return "#7F0000"; }
+  my @color = (# TODO:  support a larger number of colors.
+               '#7F0000', '#660000', '#AA7F00', '#990000', '#FF0000',
+               '#000099', '#0000FF', '#7F007F', '#FF00FF', '#007F7F', '#00FFFF');
+  $speaker =~ s/_//g;
+  $speaker =~ s/[_0-9]+$//;
+  $speaker = lc $speaker;
+  my $counter;
+  foreach my $char (split //, $string) {
+    $counter += ord $char;
+  }
+  return $color[counter % ($#color + 1)];
+}
+
 sub haveseenlately {
   my ($nick) = @_;
   # Check to see if we've seen that user "lately".
@@ -1404,17 +1482,18 @@ sub viewmessage {
 #}
 
 sub ampmtime {
-  my ($when) = @_;
+  my ($when, $dosec) = @_;
   # TODO:  say "Noon" or "Midnight" when appropriate.
   my $hour   = ($when->hour() % 12) || 12;
-  my $minute = $when->minute();
+  my $minute = sprintf "%02d", $when->minute();
+  my $second = $dosec ? (":" . sprintf "%02d", $when->second()) : '';
   my $ampm   = '';
   my $now    = DateTime->now(@tz);
   if (($when->clone()->add(hours => 12) > $now)
       or ($now->add(hours => 12) > $when)) {
     $ampm = ($when->hour >= 12) ? 'pm' : 'am';
   }
-  return $hour . ":" . (sprintf "%02d", $minute) . $ampm;
+  return $hour . ":" . $minute . $second . $ampm;
 }
 
 sub friendlytime { # TODO: make some parts of this customizable via userpref, beyond just the timezone.
@@ -1426,7 +1505,7 @@ sub friendlytime { # TODO: make some parts of this customizable via userpref, be
   my $utc = '';
   if ($displaytz ne ('UTC')) {
     my $utcnow = DateTime->now( time_zone => 'UTC');
-    $utc = ' (' . $utcnow->hour . ":" . $utcnow->minute . ' ' . friendlytz($utcnow) . ')';
+    $utc = ' (' . $utcnow->hour . ":" . (sprintf "%02d", $utcnow->minute) . ' ' . friendlytz($utcnow) . ')';
   }
   if ($style eq 'announce') {
     return "It is now " . $when->day_name() . ", " . $when->year()
@@ -1434,6 +1513,8 @@ sub friendlytime { # TODO: make some parts of this customizable via userpref, be
       . " " . friendlytz($when) . $utc;
   } elsif ($style eq 'alarm') {
     return ampmtime($when) . " " . friendlytz($when);
+  } elsif ($style eq 'hms') {
+    return ampmtime($when, 'doseconds') . " " . friendlytz($when);
   } elsif (($when->ymd() eq $now->ymd())
       or ($when->clone()->add(hours => 12) > $now)) {
     return "at " . ampmtime($when) . " " . friendlytz($when) . $utc;

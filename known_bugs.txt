@@ -1,4 +1,6 @@
 Known bugs:
+ * The new backscroll feature implementation is incomplete and does
+   not yet actually do anything useful.
  * When setting an alarm, the date is not optional.  You have to
    at least say "today", which is annoying.
  * The !brownies trigger (for foodservice) is buggy.
@@ -20,8 +22,6 @@ Known bugs:
    the bot should wait until it hears from the operator again
    before sending any further reminders.  Fixing this probably
    requires storing an additional variable in the database.
- * When friendlytime() adds UTC hour and minute in parentheses,
-   the minute is not zero-padded to two digits.  It should be.
 
 Features Wanted:
  * It should be possible to configure permanent bcc for !sms

@@ -101,6 +101,18 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS bottrigger (
      flags         tinytext)");
 $q->execute();
 
+# Backscroll:
+
+$q = $db->prepare("CREATE TABLE IF NOT EXISTS backscroll (
+     id             integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     channel        tinytext,
+     number         integer,
+     whensaid       datetime,
+     speaker        tinytext,
+     flags          tinytext,
+     message        text)");
+$q->execute();
+
 ###################################################################
 # Tables related to email and SMS features:                       #
 ###################################################################
@@ -344,6 +356,7 @@ for my $var (@var) {
   }
 }
 if (-e "bot-help.html") { # we appear to have been run from the jonadabot dir
+  use File::Spec::Functions;
   for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
     my $dest = catfile($$pubdir{value}, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
