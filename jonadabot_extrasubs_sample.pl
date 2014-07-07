@@ -141,7 +141,7 @@ our %routine = (
                                                        ],
                                            sweeten  => [''],
                                            flavors  => [''], # baked in
-                                           toppings => [''],
+                                           toppings => ['', '', '', 'vanilla ice cream'],
                                          },
                              milk => +{ quantity => ['a glass of', 'a tall glass of', 'a small glass of', ''],
                                         quality  => ['', '', 'cold', 'cold', 'hot', 'warm', 'condensed'],
@@ -198,7 +198,7 @@ our %routine = (
                       $clause = "topped with $major$choice" if $choice;
                     }
                     $clause;
-                  } qw(quantity quality theitem sweeten flavors)) . ".";
+                  } qw(quantity quality theitem sweeten flavors toppings)) . ".";
                 },
                 congrats => sub { # useful as followup from a logfile regex callback
                   my ($player, $item) = @_;

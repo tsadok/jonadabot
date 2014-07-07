@@ -267,13 +267,13 @@ sub sendqueuedmail {
 }
 
 sub checkalarms {
-  my $now   = DateTime->now(@tz);
+  my $now   = DateTime->now( time_zone => 'UTC' ); # Semantics are that the alarm record in the DB always has UTC times only.
   my $dbnow = DateTime::Format::ForDB($now);
   my @alarm = grep { $$_{alarmdate} le $dbnow } findrecord('alarm', 'status', 0);
   if (@alarm) {
     @alarm = grep { (not $$_{snoozetill}) or ($$_{snoozetill} le $dbnow) } @alarm;
     for my $alarm (@alarm) {
-      my $ftime = friendlytime($now, getircuserpref($$alarm{nick}, 'timezone')|| $prefdefault{timezone});
+      my $ftime = friendlytime($now, (getircuserpref($$alarm{nick}, 'timezone')|| $prefdefault{timezone}), 'alarm');
       my $says  = ($$alarm{sender} eq $$alarm{nick}) ? '' : qq[$$alarm{sender} says];
       warn "No nick for alarm $$alarm{id}" if not $$alarm{nick};
       say("It's ${ftime}: [$$alarm{id}] $says$$alarm{message}", sender => $$alarm{nick}, channel => 'private');
@@ -299,10 +299,10 @@ sub checkalarms {
                                 time_zone => (getircuserpref($$ralarm{nick}, 'timezone') || $prefdefault{timezone} || $servertz),
                                 hour      => $$ralarm{hour},
                                 minute    => $$ralarm{minute},
-                              );
+                              )->set_time_zone("UTC");
       addrecord('alarm', +{ nick      => $$ralarm{nick},
                             sender    => $$ralarm{sender},
-                            setdate   => DateTime::Format::ForDB($dbnow),
+                            setdate   => $dbnow,
                             alarmdate => DateTime::Format::ForDB($when),
                             message   => $$ralarm{message},
                             flags     => 'A', # A means Automatically set, as opposed to directly by the user each time.
@@ -603,9 +603,9 @@ sub debuginfo {
 }
 
 sub handlectcp {
-  my ($self, $target, $tag, $msg, $type, $blah) = @_;
+  my ($self, $sender, $target, $tag, $msg, $type) = @_;
   my $respond = 0;
-  logit("handlectcp(self, $target, $tag, $msg, $type, $blah)") if $debug{ctcp};
+  logit("handlectcp(self, $sender, $target, $tag, $msg, $type)") if $debug{ctcp};
   updatepingtimes($target, 'ctcp', $tag);
   if ($type eq 'NOTICE') { # The CTCP message was in a channel.  Only respond if sender is a master.
     $respond = ($irc{master}{$target}) ? 1 : 0;
@@ -628,6 +628,9 @@ sub handlectcp {
     } else {
       # TODO: support PING in a safer, more minimal way.
     }
+  } elsif ($tag eq 'ACTION') {
+    # TODO: check whether $target is a channel we follow and save backscroll if appropriate.
+    #       Also, if it's an okdom channel, maybe respond if we are mentioned by name.
   } # TODO: DCC support might be a useful way to deliver things like backscroll.
   logit("handlectcp: respond $respond, response $response", 3) if $debug{ctcp};
   if ($respond and $response) {
@@ -650,10 +653,10 @@ sub handlemessage {
   #warn "[push irc{channel}{$howtorespond}, $sender]\n";
   $irc{channel} ||= +{};
   $irc{channel}{lc $howtorespond} ||= +{};
-  logit("Adding $sender to recent activity list for channel $howtorespond");
+  logit("Adding $sender to recent activity list for channel $howtorespond") if $debug{recentactivity};
   push @{$irc{channel}{lc $howtorespond}{recentactivity}}, $sender;
-  my $bslimit = max(getconfigvar($cfgprofile, "backscroll$howtorespond"));
-  logit("backscroll limit: $bslimit") if $debug{backscroll} > 6;
+  my $bslimit = 0 + max(getconfigvar($cfgprofile, "backscroll$howtorespond"));
+  logit("backscroll limit for $howtorespond: $bslimit") if $debug{backscroll} > 6;
   if ($bslimit > 0) {
     logit("Saving backscroll for channel $howtorespond") if $debug{backscroll} > 5;
     my $ptr = findrecord('config', cfgprofile => $cfgprofile, varname => "bsi_$howtorespond", enabled => 1 )
@@ -916,8 +919,9 @@ sub handlemessage {
     if ($text =~ m~^!alarm set (.+)~i) {
       my ($setparams) = ($1);
       logit("Alarm: $sender wants to set $setparams") if $debug{alarm};
-      if ($setparams =~ m~(today|tomorrow|Sun|Sunday|Mon|Monday|Tue|Tuesday|Wed|Wednesday|Thu|Thursday|Fri|Friday|Sat|Saturday|(?:\d*[-]?\s*(?:the|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*\d+(?:st|nd|rd)?))\s*(?:at)?\s*(\d+[:]?\d*[:]?\d*\s*(?:am|pm)?)\s*(.*)~i) {
+      if ($setparams =~ m~(today|tonight|tomorrow|Sun|Sunday|Mon|Monday|Tue|Tuesday|Wed|Wednesday|Thu|Thursday|Fri|Friday|Sat|Saturday|(?:\d*[-]?\s*(?:the|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|)(?:[a-z]*)\s*\d+(?:st|nd|rd)?))\s*(?:at)?\s*(\d+[:]?\d*[:]?\d*\s*(?:am|pm)?)\s*(.*)~i) {
         my ($datepart, $timepart, $message) = ($1, $2, $3);
+        my $istonight;
         if ($debug{alarm} > 3) {
           logit("datepart: $datepart", 3);
           logit("timepart: $timepart", 3);
@@ -930,6 +934,8 @@ sub handlemessage {
         if ($datepart =~ /tomorrow/) {
           $thedate = $thedate->add( days => 1 );
           logit("tomorrow: " . $thedate->ymd(), 2) if $debug{alarm} > 3;
+        } elsif ($datepart =~ /tonight/) {
+          $istonight = 'pm';
         } elsif ($datepart =~ /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)/i) {
           my $dow = $1;
           while ($thedate->day_abbr ne ucfirst lc $dow) {
@@ -949,7 +955,7 @@ sub handlemessage {
         logit("thedate: " . $thedate->ymd(), 3) if $debug{alarm} > 3;
         $timepart =~ m~(\d+)[:]?(\d*)[:]?(\d*)\s*(am|pm|)~i;
         my ($hr, $mn, $sc, $ampm) = ($1, $2, $3, $4);
-        if ($ampm eq 'pm') {
+        if (($ampm || $istonight) eq 'pm') {
           $hr += 12 unless $hr > 11;
         } elsif ($ampm eq 'am') {
           $hr = $hr % 12;
@@ -958,8 +964,9 @@ sub handlemessage {
         my $dt = DateTime->new( year => $thedate->year(), month => $thedate->month(), day => $thedate->mday(),
                                 hour => $hr, minute => ($mn || 0), second => ($sc || 0), time_zone => $tz);
         logit("dt " . $dt->ymd() . " at " . $dt->hms(), 3) if $debug{alarm} > 2;
-        $message ||= "It's " . friendlytime($dt) . "!";
-        setalarm($dt, $message, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+        $message ||= "It's " . friendlytime($dt, $tz, 'alarm') . "!";
+        my $serverdt = $dt->set_time_zone($servertz);
+        setalarm($serverdt, $message, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } else {
         say("Sorry, I did not understand that date and time.", channel => 'private', sender => $sender);
       }
@@ -972,9 +979,18 @@ sub handlemessage {
         say("No such alarm: $num", channel => 'private', sender => $sender);
       } elsif (lc($$alarm{nick}) ne lc $sender) {
         say("Not your alarm: $num", channel => 'private', sender => $sender);
+      } elsif ($rest =~ /snooze\s*(\d*)\s*(minutes|hours|days)?/) {
+        my ($num, $unit); = ($1, $2);
+        $num  ||= 10;
+        $unit ||= 'minutes';
+        my $snoozedt = DateTime->now( time_zone => "UTC" )->add( $unit => $num );
+        $$alarm{snoozetill} = DateTime::Format::ForDB($snoozedt);
+        updaterecord("alarm", $alarm);
+        say("Snoozing alarm $$alarm{id} for $num $unit", channel => 'private', sender => $sender);
       } else {
-        my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
-                                   getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
+        my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
+        logit("alarm dt: " . $alarmdt->hms()) if $debug{alarm};
+        my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz));
         say("Alarm $$alarm{id} viewed " . ($$alarm{viewcount} || 0) . " time(s), "
             . ($$alarm{status} ? 'inactive' : "set to go off $forwhen") . ".",
             channel => 'private', sender => $sender);
@@ -1000,8 +1016,8 @@ sub handlemessage {
             channel => 'private', sender => $sender);
       } elsif (getconfigvar($cfgprofile, 'maxlines') >= scalar @alarm) {
         for my $alarm (@alarm) {
-          my $forwhen = friendlytime(DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate}),
-                                     getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
+          my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
+          my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz));
           say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
         }
       } else {
@@ -1228,39 +1244,51 @@ sub handlemessage {
     my $n = scalar @notification;
     say(qq[$n notification(s) pending], channel => 'private', sender => $sender);
     processnotification();
-  } elsif ($text =~ /^backscroll\s*([#]+\S+)?\s*(\d*)/i) {
-    my ($thechan, $linecount) = ($1, $2);
+  } elsif ($text =~ /^!(backscroll|scrollback|context)\s*([#]+\S+)?\s*(\d*)/i) {
+    my ($triggertext, $thechan, $linecount) = ($1, $2, $3);
     $thechan ||= $howtorespond;
+    logit("Attempting request for backscroll for $thechan") if $debug{backscroll} > 1;
     # (The intention here is to allow a person who just connected to get what they missed.)
     # (The bot could collect the info itself or use an irssi logfile if one is available.)
     # (It would of course NEVER EVER be sent en masse to a channel, ever.)
     my $limit = max(getconfigvar($cfgprofile, "backscroll$thechan"));
     if ($limit > 0) {
+      logit("Configuration allows up to $limit lines of backscroll for $thechan", 3) if $debug{backscroll};
       my $dirpath = getconfigvar($cfgprofile, "pubdirpath");
       my $diruri  = getconfigvar($cfgprofile, "pubdiruri");
       if ($dirpath and $diruri) {
         # TODO: if linecount is not specified, try to figure out what $sender missed.
         $linecount ||= $limit;
+        logit("Will try to make an HTML backscroll record of $linecount lines", 4) if $debug{backscroll} > 2;
         my $ptr = findrecord("config", cfgprofile => $cfgprofile, varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
-        my $fn  = "backscroll${thechan}.html";
-        $fn =~ s/\W+/_/g;
+        my $fn  = "backscroll$thechan";
+        $fn =~ s/\W+/_/g;  $fn .= ".html";
         my $displaytz = getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz;
-        open HTML, ">", catfile($dirpath, $fn);
-        print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
-        for my $num (1 .. $linecount) {
-          my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
-          my $r  = findrecord("backscroll", channel => $thechan, number => $i);
-          if (ref $r) {
-            my $time    = friendlytime(DateTime::From::MySQL($$r{whensaid}), $displaytz, 'hms');
-            my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
-            my $speaker = encode_entities($speaker);
-            my $message = encode_entities($message);
-            print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
+        logit("filename: $fn; timezone: $displaytz; pointer: $$ptr{value} (id$$ptr{id})", 4) if $debug{backscroll} > 4;
+        if (open HTML, ">", catfile($dirpath, $fn)) {
+          print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
+          for my $num (1 .. $linecount) {
+            my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
+            my $r  = findrecord("backscroll", channel => $thechan, number => $i);
+            if (ref $r) {
+              my $time    = friendlytime(DateTime::From::MySQL($$r{whensaid}), $displaytz, 'hms');
+              my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
+              my $speaker = encode_entities($speaker);
+              my $message = encode_entities($message);
+              logit("index $i, record $$r{id}, speaker $speaker, color $color, at $time", 5) if $debug{backscroll} > 8;
+              print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
+            } elsif ($debug{backscroll} > 7) {
+              logit("index $i, no backscroll record", 5);
+            }
           }
+          print HTML qq[</tbody></table>\n</body></html>];
+          close HTML;
+          say(catfile($diruri, $fn),
+              channel => $howtorespond, fallbackto => 'private', sender => $sender);
+        } else {
+          say("I couldn't seem to write out a backscroll record, sorry.",
+              channel => $howtorespond, fallbackto => 'private', sender => $sender);
         }
-        print HTML qq[</tbody></table>\n</body></html>];
-        say(catfile($diruri, $fn),
-            channel => $howtorespond, fallbackto => 'private', sender => $sender);
       } else {
         say(qq[$irc{oper} hasn't set me up a pubdir.  (Perhaps up to $maxlines lines could be delivered via /msg, but that isn't implemented yet.)],
             channel => $howtorespond, fallbackto => 'private', sender => $sender);
@@ -1483,7 +1511,6 @@ sub viewmessage {
 
 sub ampmtime {
   my ($when, $dosec) = @_;
-  # TODO:  say "Noon" or "Midnight" when appropriate.
   my $hour   = ($when->hour() % 12) || 12;
   my $minute = sprintf "%02d", $when->minute();
   my $second = $dosec ? (":" . sprintf "%02d", $when->second()) : '';
@@ -1493,7 +1520,15 @@ sub ampmtime {
       or ($now->add(hours => 12) > $when)) {
     $ampm = ($when->hour >= 12) ? 'pm' : 'am';
   }
-  return $hour . ":" . $minute . $second . $ampm;
+  if (($minute eq '00') and ($when->hour == 12) and not $dosec) {
+    return 'Noon';
+  } elsif (($minute eq '00') and ($when->hour == 0) and not $dosec) {
+    return 'Midnight';
+  } elsif (($minute eq '00') and $ampm and not $dosec) {
+    return $hour . $ampm;
+  } else {
+    return $hour . ":" . $minute . $second . $ampm;
+  }
 }
 
 sub friendlytime { # TODO: make some parts of this customizable via userpref, beyond just the timezone.
@@ -1794,10 +1829,11 @@ sub processnotification {
 
 sub setalarm {
   my ($dt, $text, %arg) = @_;
+  $utcdt = $dt->clone()->set_time_zone("UTC");
   my $alarm = +{ nick      => ($arg{nick} || $arg{sender}),
                  sender    => $arg{sender},
-                 setdate   => DateTime::Format::ForDB(DateTime->now(@tz)),
-                 alarmdate => DateTime::Format::ForDB($dt),
+                 setdate   => DateTime::Format::ForDB(DateTime->now( time_zone => "UTC" )),
+                 alarmdate => DateTime::Format::ForDB($utcdt),
                  message   => ($text || "Alarm!"),
                  status    => 0, # 0 = active; 1 = inactive
                };
@@ -1805,10 +1841,11 @@ sub setalarm {
   my $result = addrecord("alarm", $alarm);
   my $id = $db::added_record_db;
   if ($result) {
-    say("Alarm set for " . (friendlytime($dt), getircuserpref($arg{nick}, 'timezone') || $prefdefault{timezone} || $servertz)
+    say("Alarm set for " . (friendlytime($dt, (getircuserpref($arg{nick}, 'timezone') || $prefdefault{timezone} || $servertz), 'alarm'))
         . " ($id)", %arg);
   } else {
-    say("Failed to set alarm", %arg);
+    logit("Failed to set alarm: " . $dt . " %arg ($text)");
+    say("Failed to set alarm");
   }
 }
 

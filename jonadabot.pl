@@ -14,6 +14,8 @@ use DateTime;
 use Mail::Sendmail;
 use Digest::SHA256;
 use AnyEvent::ForkManager;
+use File::Spec::Functions;
+use HTML::Entities;
 
 our $cfgprofile = ((grep { $_ } map { /^cfgprofile=(\w+)/; $1 } @ARGV), 'jonadabot')[0];
 print "Using config profile: $cfgprofile\n";
@@ -21,6 +23,7 @@ our $servertz         = 'America/New_York'; # This can't be stored in the DB,
                                             # because the DB code uses it.
                                             # Perhaps I should move it into dbconfig?
                                             # But it's used elsewhere than the DB too.
+# Note that $servertz is the timezone of the computer the bot runs on.
 
 my @tz                = ( time_zone => $servertz );
 our %friendlytzname   = (# If a timezone isn't listed here, all that happens
@@ -217,7 +220,7 @@ $irc->reg_cb (privatemsg => sub {
                                 messg => $ircmessage,
                               }) if $debug{privatemsg} > 5;
                 my ($recipient, $text) = @{$$ircmessage{params}};
-                logit("Private Message from $$ircmessage{prefix}: $text", 1);
+                logit("Private Message from $$ircmessage{prefix}: $text", 1) if $debug{privatemsg} > 1;
                 handlemessage($$ircmessage{prefix}, $text, 'private');
               });
 $irc->reg_cb (error => sub { my ($client, $code, $msg, $ircmsg) = @_;

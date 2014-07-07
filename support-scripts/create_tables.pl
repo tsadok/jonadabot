@@ -175,6 +175,7 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS smsmnemonic (
      destination   integer,
      ircnick       tinytext,
      mnemonic      tinytext,
+     bcc           tinytext,
      flags         tinytext)");
 $q->execute();
 
