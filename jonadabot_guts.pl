@@ -623,10 +623,8 @@ sub handlectcp {
     my $dt       = DateTime->now(@tz);
     $response = $dt->year() . ' ' . $dt->month_abbr() . ' ' . $dt->mday() . ' at ' . ampmtime($dt) . ' ' . friendlytz($dt);
   } elsif ($tag eq 'PING') {
-    if ($irc{master{$target}}) {
-      # TODO: support PING fully
-    } else {
-      # TODO: support PING in a safer, more minimal way.
+    if ($msg =~ /([0-9 ]+)/) {
+      $response = $1;
     }
   } elsif ($tag eq 'ACTION') {
     # TODO: check whether $target is a channel we follow and save backscroll if appropriate.
