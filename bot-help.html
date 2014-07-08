@@ -107,12 +107,14 @@
 
 <div class="p">
   <div><a name="backscroll" class="trigger">!backscroll</a> <span class="triggerargs">#channel number-of-lines</span></div>
-  Currently this is not implemented, but I intend to make the bot fill in
-  users who have missed recent channel content due to connection problems
-  (only upon request, of course, and only when configured to do so on a
-  per-channel basis; the person configuring it in this manner should have
-  permission from the channel operators).  The number of lines will be
-  limited as configured, again on a per-channel basis.
+  If configured to do so, the bot fill in users who have missed recent
+  channel content due to connection problems.  This has to be enabled
+  by the bot operator on a per-channel basis, and the maximum number
+  of lines of backscroll that can be retrieved is limited by whatever
+  the bot operator set up, also on a per-channel basis.  Currently,
+  deliever is limited to HTML (the bot will write the HTML file and
+  reply with a link).  In the future I want to add delivery via /msg,
+  but this has not yet been implemented.
 </div>
 
 <div class="p">

@@ -20,7 +20,12 @@ $outfile ||= 'backscroll-color-demo.html';
 open HTML, ">", $outfile;
 print HTML qq[<html><head>\n  <title>backscroll nick color demo</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
 my $count;
-my %special = ();
+my %special = ( 1 => 'Audience (First Defined Color)',
+                2 => 'The Bot Itself (Color 2) ',
+                3 => 'Primary Bot Operator (3)',
+                4 => 'Persons with Master Privileges (4)',
+                5 => 'Sibling Bots (5)',
+              );
 for my $color (@color) {
   $count++;
   my $colorname = $special{$count} ? $special{$count} : qq[Nick Color $count];
