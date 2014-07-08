@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 
-
 use AnyEvent::IRC::Util qw(encode_ctcp);
 
 our %debug = ( # These are the default defaults...
@@ -245,12 +244,14 @@ sub sendqueuedmail {
   $Mail::Sendmail::mailcfg{retries} = 7;
   $Mail::Sendmail::mailcfg{delay}   = 113;
   $Mail::Sendmail::mailcfg{smtp}    = [ $$server{server} ];
+  my $enqdate = DateTime::Format::Mail->format_datetime(
+                   DateTime::From::MySQL($$msg{enqueued})->set_time_zone($servertz) );
   my %mail = ( From        => $$msg{fromfield} || getconfigvar($cfgprofile, 'ircemailaddress'),
                Subject     => $$msg{subject} || 'Message from IRC ($irc{nick})',
                Bcc         => $$msg{bcc},
                To          => $$msg{tofield},
-              #'User-Agent' => qq[$devname $version (operated on $hostname by $irc{oper})],
-               # TODO: Date based on the enqueued datetime
+               Date        => $enqdate,
+               #'User-Agent' => qq[$devname $version (operated on $hostname by $irc{oper})],
                message     => $$msg{body},
              );
   $$msg{trycount}++;

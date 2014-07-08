@@ -16,6 +16,7 @@ use Digest::SHA256;
 use AnyEvent::ForkManager;
 use File::Spec::Functions;
 use HTML::Entities;
+use DateTime::Format::Mail;
 
 our $cfgprofile = ((grep { $_ } map { /^cfgprofile=(\w+)/; $1 } @ARGV), 'jonadabot')[0];
 print "Using config profile: $cfgprofile\n";
