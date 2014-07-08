@@ -245,7 +245,7 @@ sub sendqueuedmail {
   $Mail::Sendmail::mailcfg{delay}   = 113;
   $Mail::Sendmail::mailcfg{smtp}    = [ $$server{server} ];
   my $enqdate = DateTime::Format::Mail->format_datetime(
-                   DateTime::From::MySQL($$msg{enqueued})->set_time_zone($servertz) );
+                   DateTime::Format::MySQL->parse_datetime($$msg{enqueued})->set_time_zone($servertz) );
   my %mail = ( From        => $$msg{fromfield} || getconfigvar($cfgprofile, 'ircemailaddress'),
                Subject     => $$msg{subject} || 'Message from IRC ($irc{nick})',
                Bcc         => $$msg{bcc},
@@ -639,7 +639,7 @@ sub handlectcp {
       $$ptr{value} = (($$ptr{value} + 1) % $bslimit);
       my $bsr = findrecord("backscroll", channel => $target, number => $$ptr{value})
         || +{ channel => $target, number => $$ptr{value} };
-      $$bsr{whensaid} = DateTime::Format::ForDB(DateTime->now(@tz));
+      $$bsr{whensaid} = DateTime::Format::ForDB(DateTime->now(time_zone => 'UTC'));
       $$bsr{speaker}  = $sender;
       $$bsr{message}  = $msg;
       $$bsr{flags}    = 'A'; # ACTION
@@ -706,7 +706,7 @@ sub handlemessage {
     $$ptr{value} = (($$ptr{value} + 1) % $bslimit);
     my $bsr = findrecord("backscroll", channel => $howtorespond, number => $$ptr{value})
       || +{ channel => $howtorespond, number => $$ptr{value} };
-    $$bsr{whensaid} = DateTime::Format::ForDB($now);
+    $$bsr{whensaid} = DateTime::Format::ForDB(DateTime->now(time_zone => 'UTC'));
     $$bsr{speaker}  = $sender;
     $$bsr{message}  = $text;
     $$bsr{flags}    = '';
@@ -1292,8 +1292,9 @@ sub handlemessage {
     logit("Attempting request for backscroll for $thechan") if $debug{backscroll} > 1;
     # (The intention here is to allow a person who just connected to get what they missed.)
     # (The bot could collect the info itself or use an irssi logfile if one is available.)
-    # (It would of course NEVER EVER be sent en masse to a channel, ever.)
+    # (It will of course NEVER EVER be sent en masse to a channel, ever.)
     my $limit = max(getconfigvar($cfgprofile, "backscroll$thechan"));
+    # TODO: support delivery via /msg of up to (bsmaxlines || maxlines) lines.
     if ($limit > 0) {
       logit("Configuration allows up to $limit lines of backscroll for $thechan", 3) if $debug{backscroll};
       my $dirpath = getconfigvar($cfgprofile, "pubdirpath");
@@ -1307,16 +1308,18 @@ sub handlemessage {
         $fn =~ s/\W+/_/g;  $fn .= ".html";
         my $displaytz = getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz;
         logit("filename: $fn; timezone: $displaytz; pointer: $$ptr{value} (id$$ptr{id})", 4) if $debug{backscroll} > 4;
-        if (open HTML, ">", catfile($dirpath, $fn)) {
+        my $filepath = catfile($dirpath, $fn);
+        if (open HTML, ">", $filepath) {
+          logit("Opened $filepath", 5) if $debug{backscroll} > 5;
           print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
           for my $num (1 .. $linecount) {
             my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
             my $r  = findrecord("backscroll", channel => $thechan, number => $i);
             if (ref $r) {
-              my $time    = friendlytime(DateTime::From::MySQL($$r{whensaid}), $displaytz, 'hms');
+              my $time    = friendlytime(DateTime::Format::MySQL->parse_datetime($$r{whensaid})->set_time_zone("UTC"), $displaytz, 'hms');
               my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
-              my $speaker = encode_entities($speaker);
-              my $message = encode_entities($message);
+              my $speaker = encode_entities($$r{speaker});
+              my $message = encode_entities($$r{message});
               logit("index $i, record $$r{id}, speaker $speaker, color $color, at $time", 5) if $debug{backscroll} > 8;
               print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
             } elsif ($debug{backscroll} > 7) {
@@ -1328,6 +1331,7 @@ sub handlemessage {
           say(catfile($diruri, $fn),
               channel => $howtorespond, fallbackto => 'private', sender => $sender);
         } else {
+          logit("Unable to open for write: $filepath");
           say("I couldn't seem to write out a backscroll record, sorry.",
               channel => $howtorespond, fallbackto => 'private', sender => $sender);
         }
