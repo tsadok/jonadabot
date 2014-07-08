@@ -541,7 +541,9 @@ sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, on
   # To that end, a sample bot-help.html file is included with the distribution.
   my ($item) = @_;
   if ($item eq '') {
-    return "For more info: !help topic, where topic is deaths, gt, member, message, rng, seen, tea, tell, time, trophies";
+    return "For more info: !help topic, where topic is alarm, deaths, gt, member, message, rng, seen, tea, tell, time, trophies";
+  } elsif ($item eq 'alarm') {
+    return '!alarm set Tuesday at 3pm Dentist Appointment'; # One example is woefully inadequate for this one; see bot-help.html
   } elsif ($item eq 'deaths') {
     return '!deaths (refetches info from server), !deaths url (instant, does not fetch), !deaths reparse clan=$irc{clan}';
   } elsif ($item eq 'gt') {
@@ -628,8 +630,49 @@ sub handlectcp {
       $response = $1;
     }
   } elsif ($tag eq 'ACTION') {
-    # TODO: check whether $target is a channel we follow and save backscroll if appropriate.
-    #       Also, if it's an okdom channel, maybe respond if we are mentioned by name.
+    my $bslimit = 0 + max(getconfigvar($cfgprofile, "backscroll$target"));
+    if ($bslimit > 0) {
+      # TODO: save backscroll if appropriate.
+      logit("Saving ACTION backscroll for channel $howtorespond") if $debug{backscroll} > 5;
+      my $ptr = findrecord('config', cfgprofile => $cfgprofile, varname => "bsi_$target", enabled => 1 )
+        || +{ cfgprofile => $cfgprofile, varname => "bsi_$target", enabled => 1, value => -1 };
+      $$ptr{value} = (($$ptr{value} + 1) % $bslimit);
+      my $bsr = findrecord("backscroll", channel => $target, number => $$ptr{value})
+        || +{ channel => $target, number => $$ptr{value} };
+      $$bsr{whensaid} = DateTime::Format::ForDB(DateTime->now(@tz));
+      $$bsr{speaker}  = $sender;
+      $$bsr{message}  = $msg;
+      $$bsr{flags}    = 'A'; # ACTION
+      if ($$bsr{id}) {
+        updaterecord("backscroll", $bsr);
+      } else {
+        addrecord("backscroll", $bsr);
+      }
+      if ($$ptr{id}) {
+        updaterecord("config", $ptr);
+      } else {
+        addrecord("config", $ptr);
+      }
+    }
+    # If it's an okdom channel, maybe respond if we are mentioned by name:
+    if (index((lc $msg), (lc $irc{nick})) >= 0) {
+      my $respondchance = getconfigvar($cfgprofile, 'respondwhennamed') || 0;
+      # To avoid infinite loops if somebody puts a second instance of
+      # the bot in the same channel, the chance can never be 100 percent:
+      $respondchance = 80 if $respondchance >= 95;
+      if (($respondchance <= rand(100)) and
+          (grep { $_ eq $target } getconfigvar($cfgprofile, 'ircchanokdom'))) {
+        if (ref $routine{respondwhennamed}) {
+          $routine{respondwhennamed}->($target, $sender, $msg, 'ACTION');
+        } else { # default:
+          my @adv = ("", "casually ", "brazenly ", "openly ", "quickly ", "dismissively ", "");
+          my @verb = ("mentions", "refers to", "ridicules", "answers", "hugs", "holds hands with", "slaps", "smites", "kisses");
+          my $adv = $adv[int rand rand @adv];
+          my $verb = $verb[int rand rand @verb];
+          say("/me $adv$verb $sender", channel => $target, sender => $sender, fallbackto => 'private');
+        }
+      }
+    }
   } # TODO: DCC support might be a useful way to deliver things like backscroll.
   logit("handlectcp: respond $respond, response $response", 3) if $debug{ctcp};
   if ($respond and $response) {
@@ -666,6 +709,7 @@ sub handlemessage {
     $$bsr{whensaid} = DateTime::Format::ForDB($now);
     $$bsr{speaker}  = $sender;
     $$bsr{message}  = $text;
+    $$bsr{flags}    = '';
     if ($$bsr{id}) {
       updaterecord("backscroll", $bsr);
     } else {
@@ -904,7 +948,6 @@ sub handlemessage {
       say($answer, channel => 'private', sender => $sender, fallbackto => 'private' );
     }
   } elsif ($text =~ /^!(time|date)/) {
-    # TODO:  allow the user to specify a timezone (but be careful about security issues).
     my $date = friendlytime(DateTime->now(@tz), getircuserpref($sender, 'timezone'), 'announce');
     say ($date, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!(?:rot13|ebg13)/i) {
@@ -970,7 +1013,7 @@ sub handlemessage {
         say("Sorry, I did not understand that date and time.", channel => 'private', sender => $sender);
       }
     } elsif ($text =~ /!alarm snooze/i) {
-      #TODO
+      #TODO: snooze the alarm that went off most recently.
     } elsif ($text =~ /!alarm (\d+)\s*(.*)/) {
       my ($num, $rest) = ($1, $2);
       my $alarm = getrecord('alarm', $num);
@@ -1131,7 +1174,7 @@ sub handlemessage {
                   channel => 'private', sender => $sender );
             }
           } else {
-            say("No email-to-SMS gateway configured for cellular carrier $$carrier{id}.", # TODO: better field
+            say("No email-to-SMS gateway configured for cellular carrier $$carrier{id}, $$carrier{carriername}.",
                 channel => 'private', sender => $sender );
           }
         } else {
@@ -1530,7 +1573,9 @@ sub ampmtime {
   }
 }
 
-sub friendlytime { # TODO: make some parts of this customizable via userpref, beyond just the timezone.
+sub friendlytime {
+  # TODO: make some parts of this customizable via userpref, beyond just the timezone.
+  #       For example, some users may prefer a date order other than year month day.
   my ($whendt, $displaytz, $style) = @_;
   my $when = $whendt->clone();
   $displaytz ||= $prefdefault{timezone} || $servertz || 'UTC';
@@ -1776,7 +1821,7 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
           } else {
             say("Mail::POP3Client constructor failed ($ckey)", channel =>'private', sender => $irc{oper});
           }
-        } # TODO: other actions can be implemented here, e.g. parsing a substring out of the body.
+        } # TODO: other actions can be implemented here, e.g. calling a callback to parse a substring out of the body.
           else {
           logit("biffwatch: unknown action, $action; defaulting to notify");
           biffnotify($ckey, $category, $detail, $headers, $popnum);
@@ -1788,10 +1833,6 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
         }
       }
     }
-  #} elsif ($category eq 'personal') { # TODO
-  #  logit("biffwatch: do not know how to watch for personal mail.", 6);
-  #} elsif ($category eq 'gpl') { # TODO
-  #  logit("biffwatch: do not know how to watch for gpl mail.", 6);
   } else {
     logit("Unknown watch category: $category", 6);
     warn "Unknown watch category: $category";
