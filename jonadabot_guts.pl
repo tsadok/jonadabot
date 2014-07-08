@@ -90,6 +90,7 @@ sub loadconfig {
           pingbots => [getconfigvar($cfgprofile, 'pingbot')], # Bots that will respond to !ping in a private /msg
           siblings => [getconfigvar($cfgprofile, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
          );
+  undef $irc{colorcache}; # This will get loaded when next used.
 }
 loadconfig();
 
@@ -1503,21 +1504,41 @@ sub handlemessage {
 
 sub ircnickcolor {
   my ($speaker, $context, $audience) = @_;
-  if ($speaker eq $audience)  { return "#FFFFFF"; }
-  if ($speaker eq $irc{nick}) { return "#FF4444"; }
-  if ($speaker eq $irc{oper}) { return "#AA1111"; }
-  if ($irc{master}{$speaker}) { return "#7F0000"; }
-  my @color = (# TODO:  support a larger number of colors.
-               '#7F0000', '#660000', '#AA7F00', '#990000', '#FF0000',
-               '#000099', '#0000FF', '#7F007F', '#FF00FF', '#007F7F', '#00FFFF');
+  my @defaultcolor = ( '#FFFFFF', # White
+                       '#FF4444', '#AA1111', '#7F0000', '#FF7F7F', # Red
+                       '#BBBBBB', '#AAAAAA', '#999999', '#888888', '#7F7F7F', '#666666', # Gray
+                       '#BB9933', '#AA7F00', '#996600', '#7F5500', # Orange
+                       '#FFFF7F', '#FFFF33', '#AAAA00', '#7F7F00', # Yellow / Brown
+                       '#00CC00', '#00BB00', '#00AA00', '#009900', '#33FF33', '#22CC22', # Green
+                       '#3333CC', '#0000BB', '#000099', '#6666FF', # Blue
+                       '#00CCCC', '#00AAAA', '#007F7F', '#55FFFF', '#66AAAA', # Cyan
+                       '#CC33CC', '#AA00AA', '#7F007F', '#FF33FF', '#994499', # Purple
+                     );
+  if (not defined $irc{colorcache}) {
+    $irc{colorcache} = +{};
+    my @color = getconfigvar($cfgprofile, 'nickcolor');
+    for my $special (qw(audience self operator master sibling)) {
+      @color = @defaultcolor if not scalar @color;
+      $irc{colorcache}{$special} = shift @color;
+    }
+    @color = @defaultcolor if not scalar @color;
+    $irc{colorcache}{other} = [ @color ];
+  }
+
+  if ($speaker eq $audience)  { return $irc{colorcache}{audience}; }
+  if ($speaker eq $irc{nick}) { return $irc{colorcache}{self};     }
+  if ($speaker eq $irc{oper}) { return $irc{colorcache}{operator}; }
+  if ($irc{master}{$speaker}) { return $irc{colorcache}{master};   }
+  if (grep { $_ eq $speaker } @{$irc{siblings}}) { return $irc{colorcache}{sibling}; }
   $speaker =~ s/_//g;
   $speaker =~ s/[_0-9]+$//;
   $speaker = lc $speaker;
   my $counter;
-  foreach my $char (split //, $string) {
+  foreach my $char (split //, $speaker) {
     $counter += ord $char;
   }
-  return $color[counter % ($#color + 1)];
+  logit("ircnickcolor($speaker, $context, $audience): color $counter") if $debug{backscroll} > 5;
+  return $irc{colorcache}{other}[$counter % (scalar @{$irc{colorcache}{other}})];
 }
 
 sub haveseenlately {
