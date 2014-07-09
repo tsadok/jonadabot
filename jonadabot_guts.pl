@@ -1831,8 +1831,10 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
         my $scname = ($subcat eq $category) ? $subcat : "$category / $subcat";
         logit("biffwatch: matched $scname ($detail)", 6) if $debug{biff} >= 4;
         if ($action eq 'notify') {
+          logit("calling biffnotify($ckey, $category, $detail, $headers, $popnum)", 6) if $debug{biff} > 5;
           biffnotify($ckey, $category, $detail, $headers, $popnum);
         } elsif ($action eq 'readsubject') {
+          logit("reading subject to $irc{oper}", 6) if $debug{biff} > 5;
           my @subj = grep { /^Subject[:]/ } @$headers;
           if ($irc{maxlines} < scalar @subj) {
             my $nmore = 0;
@@ -1841,6 +1843,7 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
           }
           say($_,  channel => 'private', sender => $irc{oper});
         } elsif ($action eq 'readbody') {
+          logit("reading body to $irc{oper}", 6) if $debug{biff} > 5;
           say("New $scname message [$detail] ($ckey:$popnum):", channel => 'private', sender => $irc{oper} );
           biffnotify($ckey, $category, $detail, $headers, $popnum);
           my $box = findrecord('popbox', 'mnemonic', $ckey);
