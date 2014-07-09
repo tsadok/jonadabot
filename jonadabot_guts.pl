@@ -1506,13 +1506,15 @@ sub ircnickcolor {
   my ($speaker, $context, $audience) = @_;
   my @defaultcolor = ( '#FFFFFF', # White
                        '#FF4444', '#AA1111', '#7F0000', '#FF7F7F', # Red
-                       '#BBBBBB', '#AAAAAA', '#999999', '#888888', '#7F7F7F', '#666666', # Gray
-                       '#BB9933', '#AA7F00', '#996600', '#7F5500', # Orange
-                       '#FFFF7F', '#FFFF33', '#AAAA00', '#7F7F00', # Yellow / Brown
-                       '#00CC00', '#00BB00', '#00AA00', '#009900', '#33FF33', '#22CC22', # Green
-                       '#3333CC', '#0000BB', '#000099', '#6666FF', # Blue
-                       '#00CCCC', '#00AAAA', '#007F7F', '#55FFFF', '#66AAAA', # Cyan
-                       '#CC33CC', '#AA00AA', '#7F007F', '#FF33FF', '#994499', # Purple
+                       '#BBBBBB', '#999999', '#7F7F7F', '#666666', # Gray
+                       '#BB9933', '#AA7F00', '#996600', '#886644', # Brown
+                       '#FF7F00', '#FFBB00', '#FFDD00', # Orange
+                       '#FFFFAA', '#FFFF33', '#AAAA00', '#7F7F00', # Yellow
+                       '#00CC00', '#BBFF00', '#00AA7F', '#009900', '#33FF33', '#7FCC00', # Green
+                       '#00CCCC', '#009999', '#55FFFF', '#BBFFFF', '#7FAAAA', # Cyan
+                       '#3333CC', '#6666BB', '#0000AA', '#6666FF', '#66AAFF', # Blue
+                       '#9966FF', '#7F00AA', '#CCAAFF', # Purple
+                       '#CC33CC', '#7F007F', '#FF33FF', '#FFBBFF', # Magenta
                      );
   if (not defined $irc{colorcache}) {
     $irc{colorcache} = +{};

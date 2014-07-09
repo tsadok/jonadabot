@@ -28,7 +28,7 @@ my %special = ( 1 => 'Audience (First Defined Color)',
               );
 for my $color (@color) {
   $count++;
-  my $colorname = $special{$count} ? $special{$count} : qq[Nick Color $count];
+  my $colorname = $special{$count} ? $special{$count} : qq[Nick Color $count: $color];
   my $hour = int($count / 60);
   my $min  = sprintf "%02d", ($count % 60);
   my $message = loremipsum($count);
