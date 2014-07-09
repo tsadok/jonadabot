@@ -107,15 +107,22 @@
 
 <div class="p">
   <div><a name="backscroll" class="trigger">!backscroll</a> <span class="triggerargs">#channel number-of-lines</span></div>
+  <div><a name="backscroll" class="trigger">!backscroll</a> <span class="triggerargs">#channel number-of-lines</span> <span class="triggerargverbatim">HTML</span></div>
+  <div><a name="backscroll" class="trigger">!backscroll</a> <span class="triggerargs">#channel number-of-lines</span> <span class="triggerargverbatim">/msg</span></div>
   If configured to do so, the bot fill in users who have missed recent
   channel content due to connection problems.  This has to be enabled
   by the bot operator on a per-channel basis (after obtaining permission
   from channel ops), and the maximum number of lines of backscroll
   that can be retrieved is limited by whatever the bot operator set
-  up, also on a per-channel basis.  Currently, deliever is limited to
-  HTML (the bot will write the HTML file and reply with a link).  In
-  the future I want to add delivery via /msg, but this has not yet
-  been implemented.
+  up, also on a per-channel basis.  Delivery via HTML is only available
+  if the bot operator has set up a publishing directory: the bot will
+  write an HTML file there and send you a link to it.  This allows fancy
+  formatting (including nick coloring), but you have to open a web
+  browser to view it.  Delivery via /msg sends the content directly to
+  you in IRC, but without fancy formatting.  There may be different
+  limits on the number of lines that can be supplied at once via each
+  method.  (The limit is typically lower for /msg than for HTML, but
+  this depends on configuration as set up by the bot operator.)
 </div>
 
 <div class="p">
@@ -138,7 +145,11 @@
 
 <div class="h"><a name="preferences">Your Preferences</a></div>
 <div class="p">
-  <div><a name="showpref" class="trigger">!show</a> <span class="triggerargs">prefname</span></div>
+  <div><a name="showpref" class="trigger">!show</a> <span class="triggerargsnone">[no arguments]</span></div>
+  Shows a list of preferences that can be set.
+</div>
+<div class="p">
+  <div><a class="trigger">!show</a> <span class="triggerargs">prefname</span></div>
   Shows your current value for the preference.
 </div>
 <div class="p">
@@ -148,13 +159,26 @@
 <div class="p">
   <div><a name="preftimezone" class="prefname">timezone</a></div>
   Timezones must be specified in the format DateTime::Timezone uses.  For example, the Eastern timezone
-  should be specified as <q>America/New_York</q>.
+  should be specified as <span class="triggerargverbatim">America/New_York</span>.
   <a href="http://search.cpan.org/dist/DateTime-TimeZone/">A list of all the timezones can be found here.</a>
   Note that the bot actually checks to see that whatever you specify is on the list of valid timezones
   and will not save your preference otherwise, for security reasons.
 </div>
+<div class="p">
+  <div><a name="prefbackscrolldelivery" class="prefname">backscrolldelivery</a></div>
+  If enabled by the bot operator, you can specify <span class="triggerargverbatim">HTML</span>
+  or <span class="triggerargverbatim">/msg</span>.  In the case of HTML, !backscroll requests
+  will be answered with a URL.  This allows nice presentation (e.g., nick coloring), but
+  you have to open a web browser to look at it.  In the case of /msg, the information will
+  be sent directly to you on IRC but will not have the fancy presentation.  There may be
+  different limits on the number of lines that can be presented each way.  Individual
+  !backscroll requests can also specify a specific delivery method, which overrides your
+  usual preference.
+</div>
 
-<div class="p">In the future, there may be additional preferences that you can set.</div>
+<div class="p">The above list may be incomplete, if the bot operator has set up additional
+  preferences.  Use the !show trigger without any arguments to see the complete list of
+  preferences the bot supports.</div>
 
 <div class="h"><a name="selfcommands">Personal Assistance:</a>  Keeping Track of Things</div>
 <div class="p">

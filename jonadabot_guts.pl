@@ -29,7 +29,8 @@ for my $dflt (getconfigvar($cfgprofile, "debug")) {
 }
 
 %prefdefault = ( # This is the _default_ default, if the operator doesn't set a default in the DB.
-                timezone => 'UTC',
+                timezone           => 'UTC',
+                backscrolldelivery => 'HTML',
                );
 sub loadprefdefaults {
   for my $k (keys %prefdefault) { # The default set in the database overrides the hardcoded one:
@@ -1287,45 +1288,69 @@ sub handlemessage {
     my $n = scalar @notification;
     say(qq[$n notification(s) pending], channel => 'private', sender => $sender);
     processnotification();
-  } elsif ($text =~ /^!(backscroll|scrollback|context)\s*([#]+\S+)?\s*(\d*)/i) {
-    my ($triggertext, $thechan, $linecount) = ($1, $2, $3);
+  } elsif ($text =~ m~^!(backscroll|scrollback|context)\s*([#]+\S+)?\s*(\d*)\s*(HTML|/?msg)?~i) {
+    my ($triggertext, $thechan, $linecount, $delivery) = ($1, $2, $3, $4);
     $thechan ||= $howtorespond;
     logit("Attempting request for backscroll for $thechan") if $debug{backscroll} > 1;
+    logit("User asked for $linecount lines delivered via $delivery", 2) if $debug{backscroll} > 1;
     # (The intention here is to allow a person who just connected to get what they missed.)
-    # (The bot could collect the info itself or use an irssi logfile if one is available.)
-    # (It will of course NEVER EVER be sent en masse to a channel, ever.)
     my $limit = max(getconfigvar($cfgprofile, "backscroll$thechan"));
-    # TODO: support delivery via /msg of up to (bsmaxlines || maxlines) lines.
     if ($limit > 0) {
       logit("Configuration allows up to $limit lines of backscroll for $thechan", 3) if $debug{backscroll};
-      my $dirpath = getconfigvar($cfgprofile, "pubdirpath");
-      my $diruri  = getconfigvar($cfgprofile, "pubdiruri");
-      if ($dirpath and $diruri) {
-        # TODO: if linecount is not specified, try to figure out what $sender missed.
-        $linecount ||= $limit;
-        logit("Will try to make an HTML backscroll record of $linecount lines", 4) if $debug{backscroll} > 2;
-        my $ptr = findrecord("config", cfgprofile => $cfgprofile, varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
+      # TODO: if linecount is not specified, try to figure out what $sender missed.
+      $linecount ||= $limit;
+      $delivery  ||= getircuserpref($sender, "backscrolldelivery") || $prefdefault{backscrolldelivery} || '';
+      logit("Want to do delivery via $delivery if possible", 3) if $debug{backscroll} > 2;
+      my $dirpath    = getconfigvar($cfgprofile, "pubdirpath");
+      my $diruri     = getconfigvar($cfgprofile, "pubdiruri");
+      if (not ($dirpath and $diruri)) {
+        if ((lc $delivery) eq 'html') {
+          logit("HTML delivery impossible for lack of pubdir", 3) if $debug{backscroll};
+          say("I'm afraid $irc{oper} has not set me up a publication directory yet, so I can't do HTML delivery.  Sorry.",
+              channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          return;
+        }
+        $delivery = '/msg';
+      }
+      $delivery ||= 'HTML';
+      logit("Settled on delivery method: $delivery; want to do $linecount lines", 3) if $debug{backscroll} > 1;
+      $linecount = $limit if $linecount > $limit;
+      if ((lc $delivery) ne 'HTML') {
+        my $max    = getconfigvar($cfgprofile, "bsmaxlines") || $irc{maxlines};
+        $linecount = $max if $linecount > $max;
+      }
+      logit("Linecount limited to $linecount lines", 3) if $debug{backscroll} > 2;
+      my $ptr       = findrecord("config", cfgprofile => $cfgprofile, varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
+      my $displaytz = getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz;
+      my @line;
+      for my $num (1 .. $linecount) {
+        my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
+        my $r  = findrecord("backscroll", channel => $thechan, number => $i);
+        if (ref $r) {
+          my $time    = friendlytime(DateTime::Format::MySQL->parse_datetime($$r{whensaid})->set_time_zone("UTC"), $displaytz, 'hms');
+          my $speaker = encode_entities($$r{speaker});
+          my $message = encode_entities($$r{message});
+          logit("index $i, record $$r{id}, speaker $speaker, at $time", 5) if $debug{backscroll} > 8;
+          push @line, [$time, $speaker, $message];
+        } elsif ($debug{backscroll} > 7) {
+          logit("index $i, no backscroll record", 5);
+        }
+      }
+      logit(("Found " . @line . " lines of backscroll."), 3) if $debug{backscroll};
+      if ((lc $delivery) eq 'html') {
+        logit("Will try to publish an HTML backscroll record", 4) if $debug{backscroll} > 2;
         my $fn  = "backscroll$thechan";
         $fn =~ s/\W+/_/g;  $fn .= ".html";
-        my $displaytz = getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz;
         logit("filename: $fn; timezone: $displaytz; pointer: $$ptr{value} (id$$ptr{id})", 4) if $debug{backscroll} > 4;
         my $filepath = catfile($dirpath, $fn);
         if (open HTML, ">", $filepath) {
           logit("Opened $filepath", 5) if $debug{backscroll} > 5;
           print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
-          for my $num (1 .. $linecount) {
-            my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
-            my $r  = findrecord("backscroll", channel => $thechan, number => $i);
-            if (ref $r) {
-              my $time    = friendlytime(DateTime::Format::MySQL->parse_datetime($$r{whensaid})->set_time_zone("UTC"), $displaytz, 'hms');
-              my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
-              my $speaker = encode_entities($$r{speaker});
-              my $message = encode_entities($$r{message});
-              logit("index $i, record $$r{id}, speaker $speaker, color $color, at $time", 5) if $debug{backscroll} > 8;
-              print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
-            } elsif ($debug{backscroll} > 7) {
-              logit("index $i, no backscroll record", 5);
-            }
+          for my $line (@line) {
+            my ($time, $speaker, $message) = @$line;
+            my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
+            logit("Selected color $color for speaker $$r{speaker}.") if $debug{backscroll} > 8;
+            print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
           }
           print HTML qq[</tbody></table>\n</body></html>];
           close HTML;
@@ -1337,8 +1362,13 @@ sub handlemessage {
               channel => $howtorespond, fallbackto => 'private', sender => $sender);
         }
       } else {
-        say(qq[$irc{oper} hasn't set me up a pubdir.  (Perhaps up to $maxlines lines could be delivered via /msg, but that isn't implemented yet.)],
-            channel => $howtorespond, fallbackto => 'private', sender => $sender);
+        logit("Doing backscroll delivery via /msg", 3) if $debug{backscroll};
+        for my $line (@line) {
+          my ($time, $speaker, $message) = @$line;
+          say(qq[$time < $speaker > $message],
+              channel => 'private', sender => $sender);
+          select undef, undef, undef, 0.1;
+        }
       }
     } else {
       say(qq[Backscroll is not enabled for channel $thechan  (Permission from channel ops is needed...)  Sorry.],
