@@ -23,10 +23,13 @@ our %debug = ( # These are the default defaults...
               tea        => 0,
             );
 # But we can override them with values from the DB:
-for my $dflt (getconfigvar($cfgprofile, "debug")) {
-  my ($k, $v) = split /[=]/, $dflt;
-  $debug{$k} = $v || $debug{$k};
+sub loaddebuglevels {
+  for my $dflt (getconfigvar($cfgprofile, "debug")) {
+    my ($k, $v) = split /[=]/, $dflt;
+    $debug{$k} = $v || $debug{$k};
+  }
 }
+loaddebuglevels();
 
 %prefdefault = ( # This is the _default_ default, if the operator doesn't set a default in the DB.
                 timezone           => 'UTC',
@@ -224,14 +227,22 @@ sub checksiblings {
     logit("Checking on $sib", 3) if $debug{siblings} > 3;
     my ($seen) = findrecord('seen', 'nick', $sib);
     if ($$seen{whenseen} lt $thrice) {
-      logit("Thrice: haven't seen $sib since $$seen{whenseen} (limit $thrice), pinging operator");
-      say("Hey, $irc{oper}, I haven't heard from $sib since $$seen{whenseen}.",
-          channel => 'private', sender => $irc{oper});
+      if (index($$seen{notes}, "Told $irc{oper}") < 0) {
+        logit("Thrice: haven't seen $sib since $$seen{whenseen} (limit $thrice), pinging operator") if $debug{siblings};
+        say("Hey, $irc{oper}, I haven't heard from $sib since $$seen{whenseen}.",
+            channel => 'private', sender => $irc{oper});
+        my $nowhms = $now->hms();
+        $$seen{notes} = join "\n", grep { $_ } ($$seen{notes}, qq[Told $irc{oper} $nowhms]);
+        updaterecord('seen', $seen);
+      } else {
+        logit("Thrice Again: haven't seen $sib since $$seen{wheenseen} (limit $thrice) but already told $irc{oper}.")
+          if $debug{siblings} > 3;
+      }
     } elsif ($$seen{whenseen} lt $twice) {
       logit("Twice: haven't seen $sib since $$seen{whenseen}");
-      say("!ping", channel => 'private', sender => $sib);
+      say("!ping", channel => 'private', sender => $sib) if $debug{siblings} > 1;
     } elsif ($$seen{whenseen} lt $once) {
-      logit("Once: pinging $sib");
+      logit("Once: pinging $sib") if $debug{siblings} > 2;
       say("!ping", channel => 'private', sender => $sib);
     }
   }
@@ -249,7 +260,7 @@ sub sendqueuedmail {
   my $enqdate = DateTime::Format::Mail->format_datetime(
                    DateTime::Format::MySQL->parse_datetime($$msg{enqueued})->set_time_zone($servertz) );
   my %mail = ( From        => $$msg{fromfield} || getconfigvar($cfgprofile, 'ircemailaddress'),
-               Subject     => $$msg{subject} || 'Message from IRC ($irc{nick})',
+               Subject     => $$msg{subject} || 'Message from IRC ($irc{nick}[0])',
                Bcc         => $$msg{bcc},
                To          => $$msg{tofield},
                Date        => $enqdate,
@@ -333,6 +344,7 @@ sub updateseen { # Don't call directly; call updatepingtimes() instead.
     $$s{whenseen} = $whenseen;
     $$s{channel}  = $channel;
     $$s{details}  = $text;
+    $$s{notes}    = '';
     updaterecord('seen', $s);
   } else {
     addrecord('seen', +{ nick     => $nick,
@@ -398,10 +410,10 @@ sub greeting { # punctuation may be added automatically, so don't include it
           );
   return $g[int rand rand int rand @g];
 }
-sub addnicktochannel { # Currently, we don't actually /use/ these lists for anything.
+sub addnicktochannel {
   my ($ch, @n) = @_;
   $irc{channel}{lc $ch}{nicks} = [ sort { $a cmp $b
-                                     } uniq(@n, @{$irc{channel}{$ch}{nicks}}) ];
+                                     } uniq(@n, @{$irc{channel}{lc $ch}{nicks}}) ];
   #my $now = DateTime->now( @tz );
   #$irc{channel}{lc $ch}{seen}{lc $_} = $now for @n;
   if (($irc{okdom}{$ch}) and (rand(100)<(getconfigvar($cfgprofile, 'hellochance') || 27))) {
@@ -574,9 +586,17 @@ sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, on
 
 sub debuginfo {
   my ($item, @arg) = @_;
-  if ($item eq 'channels') {
+  if ($item eq 'reload') {
+    loaddebuglevels();
+    say("Debug levels reloaded.");
+  } elsif ($item eq 'channels') {
     my @ch = keys %{$irc{channel}};
     logit("!DEBUG channels: " . join ", ", @ch);
+    return "I have written a list to my log file.";
+  } elsif ($item =~ /^channicks=/) {
+    my ($ch) = $item =~ /^channicks=(\S+)/;
+    my $nicks = join ", ", @{$irc{channel}{lc $ch}{nicks}};
+    logit("!DEBUG channicks=$ch: $nicks");
     return "I have written a list to my log file.";
   } elsif ($item eq 'recent') {
     my ($channel) = @arg;
@@ -1156,7 +1176,7 @@ sub handlemessage {
                                                       fromfield  => $from,
                                                       body       => $msg,
                                                       nick       => $sender,
-                                                      bcc        => $$smtp{bcc}, # this is allowed to be undef
+                                                      bcc        => ((join ", ", uniq(grep {$_} $$smtp{bcc}, $$mrec{bcc})) || undef),
                                                       subject    => $subject,
                                                       enqueued   => DateTime::Format::ForDB(DateTime->now(@tz)),
                                                      });
@@ -1275,7 +1295,7 @@ sub handlemessage {
           }
         }
       } else {
-        my $count   = biffhelper($popbox, undef, ['COUNT']);
+        my $count   = biffhelper($popbox, undef, ['COUNT']) + 0;
         say("$count messages waiting in $popbox", channel => 'private', sender => $sender, 'handlemessage (getting count)');
       }
     } elsif ($irc{master}{$sender}) {
@@ -1348,7 +1368,7 @@ sub handlemessage {
           print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
           for my $line (@line) {
             my ($time, $speaker, $message) = @$line;
-            my $color   = ircnickcolor($$r{speaker}, $thechan, $sender);
+            my $color   = ircnickcolor($speaker, $thechan, $sender);
             logit("Selected color $color for speaker $$r{speaker}.") if $debug{backscroll} > 8;
             print HTML qq[<tr><td class="time irctime">$time</td><th class="ircnick" style="color: $color;">$speaker</th><td class="ircmessage">$message</td></tr>\n];
           }
@@ -1425,6 +1445,11 @@ sub handlemessage {
       logit("Reloading config at the request of $sender");
       loadconfig();
       say("Basic configuration reloaded.",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    } elsif ($text =~ /^!reload debug/) {
+      logit("Reloading debug levels at the request of $sender");
+      loaddebuglevels();
+      say("Debug levels reloaded.",
           channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload pipes/) {
       # TODO:
@@ -1690,7 +1715,7 @@ sub biffhelper {
         my $count = $pop->Count();
         logit("POP3 Count: $count ($popbox => $pbr[0]{popuser} on $server[0]{serveraddress}) [BH]") if $debug{pop3} > 1;
         if ($field eq 'COUNT') {
-          push @answer, $count;
+          push @answer, $count . " [in $popbox]";
         } elsif ($field eq 'SIZE') {
           my $body = $pop->Body($msgnum);
           my $size = length($body);
@@ -1699,7 +1724,7 @@ sub biffhelper {
           my @line = $pop->Body($msgnum);
           if ($field eq 'LINES') {
             my $lc = scalar @line;
-            push @answer, qq[$lc lines];
+            push @answer, qq{[$lc lines [$popbox:$msgnum]};
           } else {
             if ($irc{maxlines} >= scalar @line) {
               for my $l (@line) {
@@ -1707,7 +1732,7 @@ sub biffhelper {
                 push @answer, $l;
               }
             } else {
-              push @answer, "Too many lines ($lc).";
+              push @answer, "Too many lines ($lc) [$popbox:$msgnum].";
             }
           }
         } elsif ($field ne uc $field) { # mixed-case fields are header fields
@@ -1715,7 +1740,7 @@ sub biffhelper {
             my @h = grep { /^$field/ } $pop->Head($msgnum);
             if (scalar @h) {
               if ($irc{maxlines} >= scalar @h) {
-                push @answer, $_ for @h;
+                push @answer, ($_ . qq{ [$popbox:$msgnum]}) for @h;
               } else {
                 push @answer, "Too many $field fields for message $msgnum ($popbox).";
               }
@@ -1753,7 +1778,7 @@ sub biffhelper {
         for my $args (@bwargs) {
           biffwatch(@$args);
         }
-        push @answer, $count;
+        push @answer, $count . qq{ messages [in $popbox]};
       } else {
         logit("Error: no server address record for popbox $popbox");
       }
@@ -1778,7 +1803,7 @@ sub biff {
   my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
   for my $confkey (@confkey) {
     logit("Biff: checking POP3: $confkey", 2);
-    my $count = biffhelper($confkey, undef, undef, undef, $owner, 'biff');
+    my $count = biffhelper($confkey, undef, undef, undef, $owner, 'biff') + 0;
     logit("Count for $confkey: $count") if $debug{biff} > 3;
     $total += $count;
     logit("Biff Count: $count ($confkey)") if $debug{pop3} > 1;

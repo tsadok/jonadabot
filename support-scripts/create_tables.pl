@@ -58,7 +58,8 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS seen (
      nick       tinytext,
      channel    tinytext,
      whenseen   datetime,
-     details    tinytext)");
+     details    tinytext
+     notes      tinytext)");
 $q->execute();
 
 # alarms set by individual IRC users:
