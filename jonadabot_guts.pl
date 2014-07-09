@@ -1841,7 +1841,7 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
             while ($irc{maxlines} <= scalar @subj) { pop @subj; $nmore++; }
             push @subj, "($nmore additional Subject lines not shown.)";
           }
-          say($_,  channel => 'private', sender => $irc{oper});
+          say($_,  channel => 'private', sender => $irc{oper}) for @subj;
         } elsif ($action eq 'readbody') {
           logit("reading body to $irc{oper}", 6) if $debug{biff} > 5;
           say("New $scname message [$detail] ($ckey:$popnum):", channel => 'private', sender => $irc{oper} );
