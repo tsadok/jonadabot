@@ -20,11 +20,24 @@ use DateTime::Format::Mail;
 
 our $cfgprofile = ((grep { $_ } map { /^cfgprofile=(\w+)/; $1 } @ARGV), 'jonadabot')[0];
 print "Using config profile: $cfgprofile\n";
-our $servertz         = 'America/New_York'; # This can't be stored in the DB,
-                                            # because the DB code uses it.
-                                            # Perhaps I should move it into dbconfig?
-                                            # But it's used elsewhere than the DB too.
-# Note that $servertz is the timezone of the computer the bot runs on.
+our $servertz = 'undef'; # We need to know the timezone of the computer the bot runs on:
+do "timezone.pl"; $servertz or die "FATAL Error: servertz not set\nYou need to create a timezone.pl, see timezone_sample.pl for an example.\n";
+
+our $devname          = 'jonadabot';
+our $author           = 'Jonadab the Unsightly One';
+our $version          = '006';
+our $devstatus        = 'beta';
+our $gitpage          = 'https://gitorious.org/jonadabot';
+our $logfile          = "/var/log/jonadabot_$version.log";
+our $utilsubs         = "jonadabot_utilsubs.pl";
+our $extrasubs        = "jonadabot_extrasubs.pl";
+our $guts             = "jonadabot_guts.pl";
+our $regexen          = "jonadabot_regexes.pl";
+our $teacode          = "jonadabot_teacode.pl";
+our $dbcode           = "jonadabot_db.pl";
+our $watchlog         = "jonadabot_filewatch.pl";
+our $defaultusername  = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
+
 
 my @tz                = ( time_zone => $servertz );
 our %friendlytzname   = (# If a timezone isn't listed here, all that happens
@@ -59,20 +72,6 @@ our %friendlytzname   = (# If a timezone isn't listed here, all that happens
                          'Australia/Perth'     => [ 'WST', 'WST'  ], # Australia/WST
                         );
 
-our $devname          = 'jonadabot';
-our $author           = 'Jonadab the Unsightly One';
-our $version          = '006';
-our $devstatus        = 'beta';
-our $gitpage          = 'https://gitorious.org/jonadabot';
-our $logfile          = "/var/log/jonadabot_$version.log";
-our $utilsubs         = "jonadabot_utilsubs.pl";
-our $extrasubs        = "jonadabot_extrasubs.pl";
-our $guts             = "jonadabot_guts.pl";
-our $regexen          = "jonadabot_regexes.pl";
-our $teacode          = "jonadabot_teacode.pl";
-our $dbcode           = "jonadabot_db.pl";
-our $watchlog         = "jonadabot_filewatch.pl";
-our $defaultusername  = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
 our $startuptime      = DateTime->now(@tz);
 
 
