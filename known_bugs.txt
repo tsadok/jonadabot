@@ -10,10 +10,6 @@ Known bugs:
 
 Features Wanted:
  * !notifications should have an option to go ahead and send up to maxlines notifications now.
- * When biff reports a header (e.g., Subject), it should probably prefix it with box and number.
-   This could be a preference, but it becomes important when there's network lag and you are
-   checking on multiple messages at once.
- * Make !biff notifications do the same thing as !notifications
  * TODO-list management:
      !todo set Remember to blah blah blah
      !todo list (just list the id numbers of your todo items)

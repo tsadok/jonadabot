@@ -98,8 +98,7 @@ sub loadconfig {
 }
 loadconfig();
 
-our @notification = (); # TODO: store notifications in the database and purge this variable.
-our @scriptqueue  = (); # This one can stay, because it gets emptied quickly.
+our @scriptqueue  = (); # This can stay as a variable, because it gets emptied quickly.
 
 our $jotcount;
 sub jot {
@@ -167,11 +166,8 @@ sub settimer {
                                       after    => 60,
                                       interval => 15,
                                       cb       => sub {
-                                        if (@notification) {
-                                          processnotification();
-                                        } else {
-                                          biff($irc{oper}) if not $count++ % 25;
-                                        }
+                                        processnotification();
+                                        biff($irc{oper}) if not $count++ % 25;
                                       }
                                      );
   $irc{timer}{script} = AnyEvent->timer(
@@ -1078,7 +1074,7 @@ sub handlemessage {
       if (0 >= scalar @alarm) {
         say("You currently have no " . (@extraarg ? "(@extraarg) " : '') . "alarms set.",
             channel => 'private', sender => $sender);
-      } elsif (getconfigvar($cfgprofile, 'maxlines') >= scalar @alarm) {
+      } elsif ((getconfigvar($cfgprofile, 'maxlines') || 12) >= scalar @alarm) {
         for my $alarm (@alarm) {
           my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
           my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz));
@@ -1223,6 +1219,25 @@ sub handlemessage {
         $$box{count} = 0;
         updaterecord("popbox", $box);
       }
+    } elsif ($text =~ /^!biff notif\w*\s*(\w*)/) { # alias for !notifications
+      my ($donow) = ($1);
+      my @n = grep { $$_{usernick} eq $sender } findnull("notification", "dequeued");
+      my $n;
+      my $pending = 'pending';
+      if ($donow eq 'sendnow') {
+        my $count = ((getconfigvar($cfgprofile, 'maxlines') || 12) - 1) || 1;
+        $pending = 'remaining';
+        while ($count and scalar @n) {
+          $n = shift @n;
+          say($$n{message}, channel => 'private', sender => $sender);
+          $$n{dequeued} = DateTime::Format::MySQL->format_datetime(DateTime->now(@tz));
+          updaterecord("notification", $n);
+          select undef, undef, undef, 0.2 if scalar @n; # Don't trip flood protection.
+          $count--;
+        }
+      }
+      my $n = scalar @n;
+      say(qq[$n notification(s) remaining], channel => 'private', sender => $sender);
     } elsif ($text =~ /^!biff list/) { # list accounts
       logit("Listing mailboxes for $sender") if $debug{biff};
       if (@box) {
@@ -1304,10 +1319,10 @@ sub handlemessage {
       logit("That's a general biff check request from $sender", 3) if $debug{biff} > 2;
       biff($sender, 'saycount');
     }
-  } elsif ($text =~ /^!notifications/ and $irc{master}{$sender}) {
-    my $n = scalar @notification;
+  } elsif ($text =~ /^!notification/) {
+    my @n = grep { $$_{usernick} eq $sender } findnull("notification", "dequeued");
+    my $n = @n;
     say(qq[$n notification(s) pending], channel => 'private', sender => $sender);
-    processnotification();
   } elsif ($text =~ m~^!(backscroll|scrollback|context)\s*([#]+\S+)?\s*(\d*)\s*(HTML|/?msg)?~i) {
     my ($triggertext, $thechan, $linecount, $delivery) = ($1, $2, $3, $4);
     $thechan ||= $howtorespond;
@@ -1549,8 +1564,13 @@ sub handlemessage {
         viewmessage(number => $num, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }
     }
-  } elsif ($sender and $irc{master}{$sender} and scalar @notification) {
-    processnotification();
+  } elsif ($sender and $irc{master}{$sender}) {
+    processnotification(); # Only doing this when a master speaks
+                           # prevents it from going off on all the
+                           # server notices when we first start up.
+    # Also, in practice, users with biff notifications are probably masters,
+    # although they wouldn't strictly have to be; note that, if no master
+    # speaks, notifications still happen on a timer.
   } else {
     # Don't do anything here that takes a lot of time.  It would cause really slow startup
     # as all the server notices are processed.
@@ -1767,7 +1787,7 @@ sub biffhelper {
               my @h = $pop->Head($i);
               logit("biffhelper: found " . @h . " headers to watch", 5) if $debug{biff} >= 5;
               for my $w (map { $$_{watchkey}} findrecord('popwatch', 'popbox', $pbr[0]{id})) {
-                push @bwargs, [$popbox, $w, [@h], $i];
+                push @bwargs, [$popbox, $w, [@h], $i, $pbr[0]{ownernick}];
               }
               $pbr[0]{count}++;
             }
@@ -1817,9 +1837,9 @@ sub biff {
 
 sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
   # TODO:  allow the same bot to watch mail for and notify multiple users.
-  my ($ckey, $category, $headers, $popnum) = @_;
+  my ($ckey, $category, $headers, $popnum, $usernick) = @_;
   my $n = scalar @$headers;
-  logit("biffwatch($ckey, $category, [$n], $popnum)", 5) if $debug{biff} >= 4;
+  logit("biffwatch($ckey, $category, [$n], $popnum, $usernick)", 5) if $debug{biff} >= 4;
   if ($watchregex{$category}) {
     for my $sc (@{$watchregex{$category}}) {
       my ($subcat, $regex, $action, $fields, $callback) = @$sc;
@@ -1831,8 +1851,8 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
         my $scname = ($subcat eq $category) ? $subcat : "$category / $subcat";
         logit("biffwatch: matched $scname ($detail)", 6) if $debug{biff} >= 4;
         if ($action eq 'notify') {
-          logit("calling biffnotify($ckey, $category, $detail, $headers, $popnum)", 6) if $debug{biff} > 5;
-          biffnotify($ckey, $category, $detail, $headers, $popnum);
+          logit("calling biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick)", 6) if $debug{biff} > 5;
+          biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick);
         } elsif ($action eq 'readsubject') {
           logit("reading subject to $irc{oper}", 6) if $debug{biff} > 5;
           my @subj = grep { /^Subject[:]/ } @$headers;
@@ -1909,7 +1929,7 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
         } # TODO: other actions can be implemented here, e.g. calling a callback to parse a substring out of the body.
           else {
           logit("biffwatch: unknown action, $action; defaulting to notify");
-          biffnotify($ckey, $category, $detail, $headers, $popnum);
+          biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick);
         }
       } else {
         logit("biffwatch: no match for $category", 6) if $debug{biff} >= 4;
@@ -1925,7 +1945,11 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
 }
 
 sub biffnotify {
-  my ($ckey, $category, $detail, $headers, $popnum) = @_;
+  my ($ckey, $category, $detail, $headers, $popnum, $usernick) = @_;
+  if (not $usernick) {
+    logit("biffnotify: called without usernick, defaulting to operator, $irc{oper} ($ckey, $category, $detail, $popnum)");
+    $usernick = $irc{oper};
+  }
   my @from = grep { /^From:/i } @$headers;
   if (not @from) {
     @from = grep { /^(X-)?Sender:/i } @$headers;
@@ -1936,20 +1960,30 @@ sub biffnotify {
   my $pnum = $popnum ? ":$popnum" : '';
   my @faddr = map { /(\S+[@]\S+)/; $1; } grep { /\S+[@]\S+/ } @from;
   my $from = (scalar @faddr) ? ", from $faddr[0]" : '';
-  push @notification, qq[$category message [$detail] received (for $ckey$pnum)$from];
+  my $notification = qq[$category message [$detail] received (for $ckey$pnum)$from];
+  addrecord("notification", +{ usernick => $usernick,
+                               flags    => 'B', # B means Biff notification
+                               message  => $notification,
+                               enqueued => DateTime::Format::MySQL->format_datetime(DateTime->now(@tz)),
+                             });
 }
 
 sub processnotification {
-  my $operator = $irc{oper};
-  # TODO: First check that the operator is actually here.
+  my @n = findnull("notification", 'dequeued');
+  return if not scalar @n;
+  my $n = shift @n;
+  my $recipient = $$n{usernick} || $irc{oper};
+  # TODO: First check that the recipient is actually here.
   # For now, I'm going to just kind of assume that:
-  my $message = shift @notification;
-  logit("Processing Notification: $message");
+  my $message = $$n{message};
+  logit("Processing Notification $$n{id}: $message");
   say($message,
       channel => 'private',
-      sender  => $operator,
+      sender  => $recipient,
      );
-  select undef, undef, undef, (0.2 * scalar @notification); # Don't trip flood protection.
+  $$n{dequeued} = DateTime::Format::MySQL->format_datetime(DateTime->now(@tz));
+  updaterecord("notification", $n);
+  select undef, undef, undef, 0.2 if scalar @n; # Don't trip flood protection.
 }
 
 sub setalarm {

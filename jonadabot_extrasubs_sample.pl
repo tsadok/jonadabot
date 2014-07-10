@@ -109,7 +109,6 @@ our %routine = (
                         }
                       } else {
                         logit("!hangman: reporting status", 5) if $debug{hangman};
-                        # TODO: recalculate $blanks per the current requester's hangmanspacing pref.
                         my %remains = map { (lc $_) => $_ } split //, $bank;
                         my $spacing = getircuserpref($arg{sender}, 'hangmanspacing');
                         $spacing = '' if not defined $spacing;

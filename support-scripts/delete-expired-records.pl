@@ -13,7 +13,7 @@ my $daysago = 7;
 for my $arg (grep { /days(?:ago)?=(\d+)/ } @ARGV) {
   $daysago = $1 || $daysago;
 }
-my $whendt = $now->clone()->subtract( days => $daysago + 1 ); # The +1 means we can ignore timezones here.
+my $whendt = $now->clone()->subtract( days => $daysago + 1 ); # The +1 means we can ignore timezones.
 my $when   = DateTime::Format::ForDB($whendt);
 
 # Always do startup records, because they are redundant with the log.
@@ -46,9 +46,20 @@ if (grep { /mail/i} @ARGV) {
   }
 }
 
+# Only do notifications if the person running the script says so:
+# (notifications currently are all from biff, but others could exist in the future)
+if (grep { /notif/i } @ARGV) {
+  print "Doing notifications...\n";
+  @exp = grep { $$_{dequeued} lt $when } getrecord('notification');
+  for my $expired (@exp) {
+    deleterecord('notification', $$expired{id});
+  }
+}
+
 # only do memoranda if the person running the script says so:
 # (memoranda are the !tell messages users leave one another)
 if (grep { /memo/i} @ARGV) {
+  print "Doing memoranda...\n";
   @exp = grep { $$_{status} == 2 } getrecord('memorandum');
   for my $expired (@exp) {
     deleterecord('memorandum', $$expired{id});

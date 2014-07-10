@@ -58,7 +58,7 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS seen (
      nick       tinytext,
      channel    tinytext,
      whenseen   datetime,
-     details    tinytext
+     details    tinytext,
      notes      tinytext)");
 $q->execute();
 
@@ -220,6 +220,16 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS mailqueue (
      body          text)");
 $q->execute();
 
+# Notifications about incoming mail that biff has noticed:
+$q = $db->prepare("CREATE TABLE IF NOT EXISTS notification (
+     id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     usernick      tinytext,
+     enqueued      datetime,
+     dequeued      datetime,
+     flags         tinytext,
+     message       tinytext)");
+$q->execute();
+
 ###################################################################
 # Tables related to logfile watching:                             #
 ###################################################################
@@ -360,7 +370,7 @@ for my $var (@var) {
 if (-e "bot-help.html") { # we appear to have been run from the jonadabot dir
   use File::Spec::Functions;
   for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
-    my $dest = catfile($$pubdir{value}, "bot-help.html");
+    my $dest = catfile($pubdir, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
       system("cp", "bot-help.html", $dest);
       my $cssdest = catfile($$pubdir{value}, "arsinoe.css");
