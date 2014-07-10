@@ -8,6 +8,7 @@ do  $dbcode;
 do  $utilsubs;
 our $cfgprofile       = askuser("Enter a short identifier for your configuration profile (default: jonadabot)") || 'jonadabot';
 
+use File::Spec::Functions;
 
 my $db = dbconn();
 
@@ -367,12 +368,12 @@ for my $var (@var) {
     }
   }
 }
-if (-e "bot-help.html") { # we appear to have been run from the jonadabot dir
-  use File::Spec::Functions;
+my $helporig = catfile("data-files", "bot-help.html");
+if (-e $helporig) { # we appear to have been run from the jonadabot dir
   for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
     my $dest = catfile($pubdir, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
-      system("cp", "bot-help.html", $dest);
+      system("cp", $helporig, $dest);
       my $cssorig = catfile("data-files", "arsinoe.css");
       my $cssdest = catfile($$pubdir{value}, "arsinoe.css");
       if (yesno("Also copy sample stylesheet to $cssdest?")) {

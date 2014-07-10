@@ -1,0 +1,1351 @@
+giant ant
+killer bee
+soldier ant
+fire ant
+giant beetle
+queen bee
+acid blob
+quivering blob
+gelatinous cube
+chickatrice
+cockatrice
+pyrolisk
+jackal
+fox
+coyote
+werejackal
+little dog
+dog
+large dog
+dingo
+wolf
+werewolf
+warg
+winter wolf cub
+winter wolf
+hell hound pup
+hell hound
+gas spore
+floating eye
+freezing sphere
+flaming sphere
+shocking sphere
+kitten
+housecat
+jaguar
+lynx
+panther
+large cat
+tiger
+gremlin
+gargoyle
+winged gargoyle
+humanoid
+hobbit
+dwarf
+bugbear
+dwarf lord
+dwarf king
+mind flayer
+master mind flayer
+manes
+homunculus
+imp
+lemure
+quasit
+tengu
+blue jelly
+spotted jelly
+ochre jelly
+kobold
+large kobold
+kobold lord
+kobold shaman
+leprechaun
+small mimic
+large mimic
+giant mimic
+wood nymph
+water nymph
+mountain nymph
+goblin
+hobgoblin
+orc
+hill orc
+Mordor orc
+Uruk-Hai
+orc shaman
+orc-captain
+rock piercer
+iron piercer
+glass piercer
+rothe
+mumak
+leocrotta
+wumpus
+titanothere
+baluchitherium
+mastodon
+sewer rat
+giant rat
+rabid rat
+wererat
+rock mole
+woodchuck
+cave spider
+centipede
+giant spider
+scorpion
+lurker above
+trapper
+white unicorn
+gray unicorn
+black unicorn
+pony
+horse
+warhorse
+fog cloud
+dust vortex
+ice vortex
+energy vortex
+steam vortex
+fire vortex
+baby long worm
+baby purple worm
+long worm
+purple worm
+grid bug
+xan
+yellow light
+black light
+zruty
+couatl
+Aleax
+Angel
+ki-rin
+Archon
+bat
+giant bat
+raven
+vampire bat
+plains centaur
+forest centaur
+mountain centaur
+baby gray dragon  
+baby silver dragon
+baby red dragon   
+baby white dragon 
+baby orange dragon
+baby black dragon 
+baby blue dragon  
+baby green dragon 
+baby yellow dragon
+gray dragon  
+silver dragon
+red dragon   
+white dragon 
+orange dragon
+black dragon 
+blue dragon  
+green dragon 
+yellow dragon
+stalker
+air elemental
+fire elemental
+earth elemental
+water elemental
+lichen
+brown mold
+yellow mold
+green mold
+red mold
+shrieker
+violet fungus
+gnome
+gnome lord
+gnomish wizard
+gnome king
+giant
+stone giant
+hill giant
+fire giant
+frost giant
+storm giant
+ettin
+titan
+minotaur
+jabberwock
+Keystone Kop
+Kop Sergeant
+Kop Lieutenant
+Kop Kaptain
+lich
+demilich
+master lich
+arch-lich
+kobold mummy
+gnome mummy
+orc mummy
+dwarf mummy
+elf mummy
+human mummy
+ettin mummy
+giant mummy
+red naga hatchling
+black naga hatchling
+golden naga hatchling
+guardian naga hatchling
+red naga
+black naga
+golden naga
+guardian naga
+ogre
+ogre lord
+ogre king
+gray ooze
+brown pudding
+black pudding
+green slime
+quantum mechanic
+rust monster
+disenchanter
+garter snake
+snake
+water moccasin
+pit viper
+python
+cobra
+troll
+ice troll
+rock troll
+water troll
+Olog-hai
+umber hulk
+vampire
+vampire lord
+Vlad the Impaler
+barrow wight
+wraith
+Nazgul
+xorn
+monkey
+ape
+owlbear
+yeti
+carnivorous ape
+sasquatch
+kobold zombie
+gnome zombie
+orc zombie
+dwarf zombie
+elf zombie
+human zombie
+ettin zombie
+giant zombie
+ghoul
+skeleton
+straw golem
+paper golem
+rope golem
+gold golem
+leather golem
+wood golem
+flesh golem
+clay golem
+stone golem
+glass golem
+iron golem
+human
+elf
+Woodland-elf
+Green-elf
+Grey-elf
+elf-lord
+Elvenking
+doppelganger
+nurse
+shopkeeper
+guard
+prisoner
+Oracle
+aligned priest
+high priest
+soldier
+sergeant
+lieutenant
+captain
+watchman
+watch captain
+Medusa
+Wizard of Yendor
+Croesus
+Izchak
+ghost
+shade
+water demon
+horned devil
+succubus
+incubus
+erinys
+barbed devil
+marilith
+vrock
+hezrou
+bone devil
+ice devil
+nalfeshnee
+pit fiend
+balrog
+Juiblex
+Yeenoghu
+Orcus
+Geryon
+Dispater
+Baalzebub
+Asmodeus
+Demogorgon
+Death
+Pestilence
+Famine
+mail daemon
+djinni
+sandestin
+jellyfish
+piranha
+shark
+giant eel
+electric eel
+kraken
+newt
+gecko
+iguana
+baby crocodile
+lizard
+chameleon
+crocodile
+salamander
+archeologist
+barbarian
+caveman
+cavewoman
+healer
+knight
+monk
+priest
+priestess
+ranger
+rogue
+samurai
+tourist
+valkyrie
+wizard
+Lord Carnarvon
+Pelias
+Shaman Karnov
+Hippocrates
+King Arthur
+Grand Master
+Arch Priest
+Orion
+Master of Thieves
+Lord Sato
+Twoflower
+Norn
+Neferet the Green
+Minion of Huhetotl
+Thoth Amon
+Chromatic Dragon
+Cyclops
+Ixoth
+Master Kaen
+Nalzok
+Scorpius
+Master Assassin
+Ashikaga Takauji
+Lord Surtur
+Dark One
+student
+chieftain
+neanderthal
+attendant
+page
+abbot
+acolyte
+hunter
+thug
+ninja
+roshi
+guide
+warrior
+apprentice
+Three Stooges
+mad scientist
+osquip
+unarmored soldier
+unarmored watchman
+Earendil
+Elwing
+High-elf
+Goblin King
+Wizard of Balance
+amulet of change
+amulet of ESP
+amulet of life saving
+amulet of magical breathing
+amulet of reflection
+amulet of restful sleep
+amulet of strangulation
+amulet of unchanging
+amulet versus poison
+cheap plastic imitation of the Amulet of Yendor
+Amulet of Yendor
+Eye of the Aethiopica
+circular amulet
+triangular amulet
+concave amulet
+spherical amulet
+pyramidal amulet
+hexagonal amulet
+oval amulet
+square amulet
+octagonal amulet
+orcish dagger
+crude dagger
+dagger
+silver dagger
+athame
+elven dagger
+runed dagger
+worm tooth
+knife
+shito
+stiletto
+scalpel
+crysknife
+axe
+battle-axe
+double-headed axe
+pick-axe
+dwarvish mattock
+broad pick
+orcish short sword
+crude short sword
+short sword
+wakizashi
+dwarvish short sword
+broad short sword
+elven short sword
+runed short sword
+broadsword
+ninja-to
+runesword
+runed broadsword
+elven broadsword
+long sword
+katana
+samurai sword
+two-handed sword
+tsurugi
+long samurai sword
+scimitar
+curved sword
+silver saber
+club
+aklys
+thonged club
+mace
+morning star
+flail
+nunchaku
+grappling hook
+iron hook
+war hammer
+quarterstaff
+staff
+partisan
+vulgar polearm
+fauchard
+pole sickle
+glaive
+naginata
+single-edged polearm
+bec-de-corbin
+beaked polearm
+spetum
+forked polearm
+lucern hammer
+pronged polearm
+guisarme
+pruning hook
+ranseur
+hilted polearm
+voulge
+pole cleaver
+bill-guisarme
+hooked polearm
+bardiche
+long poleaxe
+halberd
+angled poleaxe
+orcish spear
+crude spear
+spear
+silver spear
+elven spear
+runed spear
+dwarvish spear
+stout spear
+javelin
+throwing spear
+trident
+lance
+orcish bow
+crude bow
+orcish arrow
+crude arrow
+bow
+arrow
+elven bow
+runed bow
+elven arrow
+runed arrow
+yumi
+long bow
+ya
+bamboo arrow
+silver arrow
+sling
+crossbow
+crossbow bolt
+dart
+shuriken
+throwing star
+boomerang
+bullwhip
+rubber hose
+unicorn horn
+Cleaver
+Demonbane
+Dragonbane
+Excalibur
+Eyes of the Overworld
+Fire Brand
+Frost Brand
+Giantslayer
+Grayswandir
+Grimtooth
+Heart of Ahriman
+Longbow of Diana
+Magic Mirror of Merlin
+Magicbane
+Master Key of Thievery
+Mitre of Holiness
+Mjollnir
+Ogresmasher
+Orb of Detection
+Orb of Fate
+Orcrist
+Platinum Yendorian Express Card
+Sceptre of Might
+Snickersnee
+Staff of Aesculapius
+Sting
+Stormbringer
+Sunsword
+Trollsbane
+Tsurugi of Muramasa
+Vorpal Blade
+Werebane
+Bell of Opening
+Book of the Dead
+Candelabrum of Invocation
+Hawaiian shirt
+T-shirt
+leather jacket
+leather armor
+orcish ring mail
+crude ring mail
+studded leather armor
+ring mail
+scale mail
+orcish chain mail
+crude chain mail
+elvin mithril-coat
+splint mail
+banded mail
+dwarvish mithril-coat
+bronze plate mail
+plate mail
+tanko
+crystal plate mail
+dragon scales
+dragon scale mail
+gray dragon scales
+silver dragon scales
+red dragon scales
+white dragon scales
+orange dragon scales
+black dragon scales
+blue dragon scales
+green dragon scales
+yellow dragon scales
+gray dragon scale mail
+silver dragon scale mail
+red dragon scale mail
+white dragon scale mail
+orange dragon scale mail
+black dragon scale mail
+blue dragon scale mail
+green dragon scale mail
+yellow dragon scale mail
+mummy wrapping
+orcish cloak
+coarse mantelet
+dwarvish cloak
+hooded cloak
+leather cloak
+cloak of displacement
+piece of cloth
+oilskin cloak
+slippery cloak
+alchemy smock
+apron
+cloak of invisibility
+opera cloak
+cloak of magic resistance
+ornamental cope
+elven cloak
+faded pall
+robe
+cloak of protection
+tattered cape
+fedora
+dunce cap
+conical hat
+cornuthaum
+dented pot
+elven leather helm
+leather hat
+helmet
+kabuto
+plumed helmet
+orcish helm
+iron skull cap
+helm of brilliance
+crested helmet
+etched helmet
+helm of opposite alignment
+helm of telepathy
+visored helmet
+dwarvish iron helm
+hard hat
+leather gloves
+yugake
+old gloves
+gauntlets of dexterity
+padded gloves
+gauntlets of fumbling
+riding gloves
+gauntlets of power
+fencing gloves
+small shield
+orcish shield
+red-eyed shield
+Uruk-hai shield
+white-handed shield
+elven shield
+blue and green shield
+dwarvish roundshield
+large round shield
+large shield
+shield of reflection
+polished silver shield
+low boots
+walking shoes
+elven boots
+kicking boots
+fumble boots
+levitation boots
+jumping boots
+speed boots
+water walking boots
+mud boots
+buckled boots
+riding boots
+snow boots
+hiking boots
+combat boots
+jungle boots
+high boots
+jackboots
+iron shoes
+hard shoes
+clear potion
+potion of water
+potion of booze
+potion of fruit juice
+potion of see invisible
+potion of sickness
+potion of confusion
+potion of extra healing
+potion of hallucination
+potion of healing
+holy water
+unholy water
+potion of restore ability
+potion of sleeping
+potion of blindness
+potion of gain energy
+potion of invisibility
+potion of monster detection
+potion of object detection
+potion of enlightenment
+potion of full healing
+potion of levitation
+potion of polymorph
+potion of speed
+potion of acid
+potion of oil
+potion of gain ability
+potion of gain level
+potion of paralysis
+price identification
+ruby potion
+dark green potion
+purple-red potion
+smoky potion
+brown potion
+pink potion
+cyan potion
+puce potion
+cloudy potion
+fizzy potion
+orange potion
+sky blue potion
+milky potion
+effervescent potion
+dark potion
+yellow potion
+brilliant blue potion
+swirly potion
+black potion
+white potion
+emerald potion
+magenta potion
+bubbly potion
+golden potion
+murky potion
+stamped scroll
+scroll of mail
+scroll of identify
+scroll of light
+scroll of blank paper
+unlabeled scroll
+scroll of enchant weapon
+scroll of enchant armor
+scroll of remove curse
+scroll of confuse monster
+scroll of destroy armor
+scroll of fire
+scroll of food detection
+scroll of gold detection
+scroll of magic mapping
+scroll of scare monster
+scroll of teleportation
+scroll of amnesia
+scroll of create monster
+scroll of earth
+scroll of taming
+scroll of charging
+scroll of genocide
+scroll of punishment
+scroll of stinking cloud
+ZELGO MER
+PRATYAVAYAH
+ELBIB YLOH
+YUM YUM
+ANDOVA BEGARIN
+VELOX NEB
+READ ME
+JUYED AWK YACC
+DAIYEN FOOELS
+VERR YED HORRE
+KERNOD WEL
+KIRJE
+FOOBIE BLETCH
+NR 9
+LEP GEX FEN ZEA
+VENZAR BORGAVVE
+ELAM EBOW
+VE FORBRYDERNE
+TEMOV
+XIXAXA XOXAXA XUXAXA
+PRIRUTSENIE
+THARR
+DUAM XNAHT
+HACKEM MUCHE
+GARVEN DEH
+scroll of damage weapon
+agate stone
+torumaline
+elfin chain mail
+dead lizard
+slice of pizza
+spellbook of genocide
+badge
+Thunderfist
+Palantir of Westernesse
+wand of light
+non-directional wand
+wand of nothing
+wand of digging
+wand of enlightenment
+wand of locking
+wand of magic missile
+wand of make invisibile
+wand of opening
+wand of probing
+wand of secret door detection
+wand of speed monster
+wand of slow monster
+wand of striking
+wand of undead turning
+wand of cold
+wand of fire
+wand of lightning
+wand of sleep
+wand of cancellation
+wand of create monster
+wand of polymorph
+wand of teleportation
+wand of death
+wand of wishing
+glass wand
+oak wand
+copper wand
+aluminum wand
+short wand
+spiked wand
+balsa wand
+ebony wand
+silver wand
+uranium wand
+runed wand
+jeweled wand
+crystal wand
+marble wand
+platinum wand
+iron wand
+long wand
+maple wand
+tin wand
+iridium wand
+steel wand
+curved wand
+pine wand
+brass wand
+zinc wand
+hexagonal wand
+forked wand
+meat stick
+meat ring
+ring of adornment
+ring of hunger
+ring of protection
+ring of protection from shape changers
+ring of stealth
+ring of sustain ability
+ring of warning
+ring of aggravate monster
+ring of cold resistance
+ring of gain constitution
+ring of gain strength
+ring of increase accuracy
+ring of increase damage
+ring of invisibility
+ring of poison resistance
+ring of see invisible
+ring of shock resistance
+ring of fire resistance
+ring of free action
+ring of levitation
+ring of regeneration
+ring of searching
+ring of slow digestion
+ring of teleportation
+ring of conflict
+ring of polymorph
+ring of polymorph control
+ring of teleport control
+pearl ring
+engagement ring
+silver ring
+clay ring
+jade ring
+diamond ring
+iron ring
+shiny ring
+gold ring
+coral ring
+agate ring
+ivory ring
+twisted ring
+bronze ring
+wooden ring
+black onyx ring
+topaz ring
+emerald ring
+steel ring
+brass ring
+granite ring
+moonstone ring
+sapphire ring
+wire ring
+copper ring
+opal ring
+tiger eye ring
+ruby ring
+metallivore
+herbivore
+carnivore
+silver-hating monster
+extra damage
+to-hit bonus
+attack spell
+spellbook of force bolt
+spellbook of drain life
+spellbook of magic missile
+spellbook of cone of cold
+spellbook of fireball
+spellbook of finger of death
+clerical spell
+spellbook of protection
+spellbook of create monster
+spellbook of remove curse
+spellbook of create familiar
+spellbook of turn undead
+divination
+spellbook of detect monsters
+spellbook of light
+spellbook of detect food
+spellbook of clairvoyance
+spellbook of detect unseen
+spellbook of identify
+spellbook of detect treasure
+spellbook of magic mapping
+enchantment
+spellbook of sleep
+spellbook of confuse monster
+spellbook of slow monster
+spellbook of cause fear
+soellbook of charm monster
+escape spell
+spellbook of jumping
+spellbook of haste self
+spellbook of invisibility
+spellbook of levitation
+spellbook of teleport away
+spellbook of healing
+spellbook of cure blindness
+spellbook of cure sickness
+spellbook of extra healing
+spellbook of stone to flesh
+spellbook of restore ability
+spellbook of knock
+spellbook of wizard lock
+spellbook of dig
+spellbook of polymorph
+spellbook of cancellation
+spellbook of blank paper
+parchment spellbook
+stained spellbook
+red spellbook
+dark green spellbook
+indigo spellbook
+plaid spellbook
+dusty spellbook
+glittering spellbook
+vellum spellbook
+cloth spellbook
+orange spellbook
+turquoise spellbook
+magenta spellbook
+light brown spellbook
+bronze spellbook
+shining spellbook
+ragged spellbook
+leather spellbook
+yellow spellbook
+cyan spellbook
+purple spellbook
+dark brown spellbook
+copper spellbook
+dull spellbook
+dog eared spellbook
+white spellbook
+velvet spellbook
+light blue spellbook
+violet spellbook
+gray spellbook
+silver spellbook
+thin spellbook
+mottled spellbook
+pink spellbook
+light green spellbook
+dark blue spellbook
+tan spellbook
+wrinkled spellbook
+gold spellbook
+thick spellbook
+randomized appearance
+random number generator
+sacrifice
+prayer
+gray stone
+touchstone
+luckstone
+loadstone
+flint stone
+dilithium crystal
+diamond
+ruby
+jacinth stone
+sapphire
+black opal
+emerald
+turquoise stone
+citrine stone
+aquamarine stone
+amber stone
+topaz stone
+jet stone
+opal
+chrysoberyl stone
+garnet stone
+amethyst stone
+jasper stone
+fluorite stone
+jade stone
+obsidian stone
+agate stone
+worthless piece of white glass
+worthless piece of blue glass
+worthless piece of red glass
+worthless piece of yellowish brown glass
+worthless piece of orange glass
+worthless piece of yellow glass
+worthless piece of black glass
+worthless piece of green glass
+worthless piece of violet glass
+rock
+white gem
+blue gem
+yellowish brown gem
+orange gem
+yellow gem
+black gem
+green gem
+violet gem
+blindfold
+pair of lenses
+towel
+leash
+saddle
+tame saddled pony
+bag of holding
+chest
+ice box
+large box
+oilskin sack
+sack
+tonal instrument
+bugle
+fire horn
+frost horn
+magic flute
+magic harp
+tooled horn
+wooden flute
+wooden harp
+drum of earthquake
+leather drumm
+bell
+tin whistle
+magic whistle
+brass lantern
+oil lamp
+magic lamp
+tallow candle
+wax candle
+beartrap
+land mine
+credit card
+lock pick
+skeleton key
+bag of tricks
+can of grease
+crystal ball
+expensive camera
+figurine
+horn of plenty
+magic marker
+mirror
+looking glass
+stethoscope
+tin opener
+tinning kit
+boulder
+statue
+zorkmid
+gold coins
+comestibles
+food ration
+cram ration
+C-ration
+K-ration
+tripe ration
+lembas wafer
+cream pie
+pancake
+candy bar
+fortune cookie
+apple
+orange
+banana
+sprig of wolfsbane
+pear
+slime mold
+clove of garlic
+melon
+carrot
+eucalyptus leaf
+huge chunk of meat
+meatball
+lichen corpse
+lizard corpse
+cockatrice corpse
+cockatrice egg
+kelp frond
+royal jelly
+rotten egg
+tainted meat
+liquid diet
+tin of spinach
+decaying green substance
+empty tin
+tin of pureed monster
+tin of candied monster
+tin of sauteed monster
+tin of stir fried monster
+tin of broiled monster
+tin of szechuan monster
+tin of deep fried monster
+slippery fingers
+tin of dried monster
+tin of homemade monster
+tin of boiled monster
+tin of smoked monster
+tin of pickled monster
+tin of french fried monster
+tin of soup
+tin of rotten monster
+nausea
+heavy iron ball
+iron chain
+staircase
+ladder
+altar
+sink
+fountain
+tree
+open door
+closed door
+locked door
+doorway
+wall
+drawbridge
+iron bars
+floor of a room
+corridor
+throne
+grave
+headstone
+lava
+cloud
+solid rock
+unexplored part of the dungeon
+intrinsic protection
+formally identified
+blessed
+uncursed
+cursed
+beatitude
+level teleport
+alchemy
+credit cloning
+experience
+bribe
+pacifist
+vegetarian
+vegan
+wielded weapon
+alignment record
+foodless
+atheist
+illiterate
+never changed form
+genocideless
+wishless conduct
+Rodney
+paxed
+Death on a Stick
+blessed figurine of an archon
+artifact wish
+protection racket
+divine protection
+polypiling
+Elbereth
+Astral Plane
+Plane of Water
+Plane of Fire
+Plane of Air
+Plane of Earth
+Elemental Planes
+magic portal
+Dungeons of Doom
+Gnomish Mines
+Minetown
+Frontier Town
+Town Square
+Alley Town
+College Town
+Grotto Town
+Bustling Town
+Bazaar Town
+Mine's End
+Mimic of the Mines
+Gnome King's Wine Cellar
+Catacombs
+Delphi
+Big Room
+Sokoban
+Quest
+Archeologist Quest
+Barbarian Quest
+Caveman Quest
+Healer Quest
+Knight Quest
+Monk Quest
+Priest Quest
+Ranger Quest
+Rogue Quest
+Samurai Quest
+Tourist Quest
+Valkyrie Quest
+Wizard Quest
+Fort Ludios
+Gehennom
+Valley of the Dead
+Juiblex's Swamp
+Asmodeus' Lair
+Baalzebub's Lair
+Orcus-town
+Wizard's Tower
+Vlad's Tower
+Fake Wizard's Tower
+Vibrating square
+Moloch's Sanctum
+Rogue level
+Quest Home level
+Quest Locate level
+Quest Goal level
+strength
+dexterity
+constitution
+intelligence
+wisdom
+charisma
+hit points
+inventory
+encumbrance
+burdened
+stressed
+strained
+overtaxed
+overloaded
+carrying capacity
+nutrition
+hungry
+weak
+fainting
+satiated
+anti-magic field
+arrow trap
+dart trap
+fire trap
+hole
+magic trap
+falling rock trap
+level teleporter
+pit
+spiked pit
+polymorph trap
+rolling boulder trap
+rust trap
+sleeping gas trap
+squeaky board
+statue trap
+teleportation trap
+trap door
+caught in a web
+untrap
+poison gas
+poison needle
+explosive charge
+electric charge
+grounded
+paralysis trap
+booby-trapped
+usage fee
+general store
+used armor dealership
+second-hand bookstore
+liquor emporium
+antique weapons outlet
+delicatessen
+jeweler
+quality apparel and accessories
+hardware store
+lighting shop
+rare books store
+closed for inventory
+opulent throne room
+courtly conversation
+sceptre pounded in judgment
+leprechaun hall
+David's treasure zoo
+elephant stepping on a peanut
+seal barking
+haunted temple
+strange forbidding feeling
+strange sense of peace
+giant beehive
+angry drone
+graveyard
+unnaturally quiet
+uncanny feeling
+anthole
+blades being honed
+loud snoring
+dice being thrown
+military barracks
+pool of water
+mosquitoes
+marsh gas
+disgusting nest
+cockatrice nest
+Vlad was here
+ad aerarium
+footsteps of a guard on patrol
+someone counting money
+quarterback calling the play
