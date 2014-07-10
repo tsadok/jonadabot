@@ -1,9 +1,11 @@
 Known bugs:
  * When setting an alarm, the date is not optional.  You have to
    at least say "today", which is annoying.
- * When setting an alarm for a future date, the bot tells you that
-   the alarm was set and what time but neglects to mention the date.
-   The date is set correctly; it just makes you nervous by not saying so.
+ * When setting an alarm for a future date and checking via !alarms,
+   the bot tells you that the alarm was set and what time but neglects
+   to mention the date.  The date is set correctly; it just makes you
+   nervous by not saying so.  also, the "Hmm..." (if your debug level
+   is set high enough) is the only direct feedback when you set an alarm.
  * !reload has been revamped partially, but I still want to get it to
    the point where it can reload the main guts of the bot (in
    particular, handlemessage() and handlectcp()).  Currently that is
