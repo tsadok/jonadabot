@@ -9,7 +9,6 @@ Known bugs:
    schedule (because of things like logrotate).
 
 Features Wanted:
- * !notifications should have an option to go ahead and send up to maxlines notifications now.
  * TODO-list management:
      !todo set Remember to blah blah blah
      !todo list (just list the id numbers of your todo items)

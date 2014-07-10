@@ -62,6 +62,7 @@ our %friendlytzname   = (# If a timezone isn't listed here, all that happens
 our $devname          = 'jonadabot';
 our $author           = 'Jonadab the Unsightly One';
 our $version          = '006';
+our $devstatus        = 'beta';
 our $gitpage          = 'https://gitorious.org/jonadabot';
 our $logfile          = "/var/log/jonadabot_$version.log";
 our $utilsubs         = "jonadabot_utilsubs.pl";
@@ -105,7 +106,7 @@ if (scalar @veryrecent) {
   print "\n";
 }
 
-logit("Attempting to start $devname $version, by $author", 1);
+logit("Attempting to start $devname $version $devstatus, by $author", 1);
 addrecord('startuprecord', +{
                              whenstarted => DateTime::Format::ForDB($startuptime),
                              psid        => $$, }, );

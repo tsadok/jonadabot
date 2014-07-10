@@ -638,7 +638,7 @@ sub handlectcp {
   logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg") if $debug{ctcp};
   if ($tag eq 'VERSION') {
     my $perlver  = ($] ge '5.006') ? (sprintf "%vd", $^V) : $];
-    $response = qq[$devname $version / Perl $perlver / See $gitpage];
+    $response = qq[$devname $version $devstatus / Perl $perlver / See $gitpage];
     logit("Formulated CTCP VERSION response: $response") if $debug{ctcp};
   } elsif ($tag eq 'TIME') {
     my $dt       = DateTime->now(@tz);
@@ -1090,7 +1090,7 @@ sub handlemessage {
             or ($text =~ /(who|what) is (Ars[ie]no|jonadabot)/i)))
            or ($text =~ /^!about/)) {
     my $size = 0; $size += $_ for map { -s $_ } $0, $guts, $utilsubs, $extrasubs, $regexen, $teacode, $dbcode, $watchlog ;
-    say("/me is a Perl script, $devname version $version, $size bytes, see also $gitpage",
+    say("/me is a Perl script, $devname version $version $devstatus, $size bytes, see also $gitpage",
         channel => $howtorespond, sender => $sender, fallbackto => 'private' );
     say("I was originally written by $author and am currently operated by $irc{oper}, who frequents this same network.",
         channel => $howtorespond, sender => $sender, fallbackto => 'private' );
