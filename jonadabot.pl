@@ -40,36 +40,30 @@ our $defaultusername  = "jonadabot_" . $version . "_" . (65535 + int rand 194507
 
 
 my @tz                = ( time_zone => $servertz );
-our %friendlytzname   = (# If a timezone isn't listed here, all that happens
-                         # is jonadabot falls back to a calculating the
-                         # friendly name every time at run time.  So it's
-                         # only worth including common ones, or ones that
-                         # you know you are actually using.
-                         # I'm not certain it's worth even this much.
-                         'America/New_York'    => [ 'EST', 'EDT'  ], # This is the problem with using cities:
-                         'America/Detroit'     => [ 'EST', 'EDT'  ], # You get duplicate names for the SAME ZONE.
-                         'America/Chicago'     => [ 'CST', 'CDT'  ],
-                         'America/Denver'      => [ 'MST', 'MDT'  ],
-                         'America/Los_Angeles' => [ 'PST', 'PDT'  ],
-                         'Europe/London'       => [ 'GMT', 'BST'  ],
-                         'Europe/Paris'        => [ 'CET', 'CEST' ],
-                         'Europe/Berlin'       => [ 'CET', 'CEST' ], # And again.
-                         'Europe/Rome'         => [ 'CET', 'CEST' ], # AND AGAIN.  City-based timezone names are STUPID.
-                         'Europe/Istanbul'     => [ 'EET', 'EEST' ],
-                         'Europe/Kiev'         => [ 'EET', 'EEST' ],
-                         'Europe/Moscow'       => [ 'MSK', 'MSK'  ],
-                         'Asia/Jerusalem'      => [ 'IST', 'IDT'  ],
-                         'Asia/Damascus'       => [ 'EET', 'EEST' ],
-                         'Asia/Taipei'         => [ 'CST', 'CST'  ], # This non-uniqueness is the reason TLAs won't work as the formal name without a country or continent.
-                         'Asia/Shanghai'       => [ 'CST', 'CST'  ], # So this should be Asia/CST or so.
-                         'Asia/Tokyo'          => [ 'JST', 'JST'  ],
-                         'Asia/Seoul'          => [ 'KST', 'KST'  ],
-                         'Australia/Sydney'    => [ 'EST', 'EST'  ], # Australia/EST
-                         'Australia/Canberra'  => [ 'EST', 'EST'  ], # ditto, same zone
-                         'Australia/Melbourne' => [ 'EST', 'EST'  ], # ditto, same zone
-                         'Australia/Adelaide'  => [ 'CST', 'CST'  ], # Australia/CST
-                         'Australia/Darwin'    => [ 'CST', 'CST'  ], # ditto, same zone
-                         'Australia/Perth'     => [ 'WST', 'WST'  ], # Australia/WST
+our %friendlytzname   = ('America/New_York'    => [ 'EST', 'EDT'  ], # This is the problem with using cities:
+                         'America/Detroit'     => [ 'EST', 'EDT'  ], # You get duplicate names for the same zone.
+                         'America/Chicago'     => [ 'CST', 'CDT'  ], # People say, "WHAT?  I'm nowhere near New York."
+                         'America/Denver'      => [ 'MST', 'MDT'  ], # "I don't even know what timezone New York is in."
+                         'America/Los_Angeles' => [ 'PST', 'PDT'  ], # "That's like a two-day drive from here."
+                         'Europe/London'       => [ 'GMT', 'BST'  ], # It is in fact exactly the same timezone,
+                         'Europe/Paris'        => [ 'CET', 'CEST' ], # but people who haven't studied timezones
+                         'Europe/Berlin'       => [ 'CET', 'CEST' ], # don't know this; so it gets another name,
+                         'Europe/Rome'         => [ 'CET', 'CEST' ], # and another, and another, and another...
+                         'Europe/Istanbul'     => [ 'EET', 'EEST' ], # So despite only having thirty or forty
+                         'Europe/Kiev'         => [ 'EET', 'EEST' ], # actual time zones in the world, we have
+                         'Europe/Moscow'       => [ 'MSK', 'MSK'  ], # several hundred of them on the list.
+                         'Asia/Jerusalem'      => [ 'IST', 'IDT'  ], # The list is too long to reproduce here.
+                         'Asia/Damascus'       => [ 'EET', 'EEST' ], # Very much too long.  So I won't try.
+                         'Asia/Taipei'         => [ 'CST', 'CST'  ], # If a timezone is not listed here,
+                         'Asia/Shanghai'       => [ 'CST', 'CST'  ], # all that happens is the bot will fall back
+                         'Asia/Tokyo'          => [ 'JST', 'JST'  ], # to calculating the friendly name at run
+                         'Asia/Seoul'          => [ 'KST', 'KST'  ], # time.  That'll have to be good enough.
+                         'Australia/Sydney'    => [ 'EST', 'EST'  ], # Actually, it's tempting to just rip out
+                         'Australia/Canberra'  => [ 'EST', 'EST'  ], # this hash entirely and use the runtime
+                         'Australia/Melbourne' => [ 'EST', 'EST'  ], # calculation exclusively.
+                         'Australia/Adelaide'  => [ 'CST', 'CST'  ],
+                         'Australia/Darwin'    => [ 'CST', 'CST'  ],
+                         'Australia/Perth'     => [ 'WST', 'WST'  ],
                         );
 
 our $startuptime      = DateTime->now(@tz);
