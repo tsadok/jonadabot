@@ -373,9 +373,10 @@ if (-e "bot-help.html") { # we appear to have been run from the jonadabot dir
     my $dest = catfile($pubdir, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
       system("cp", "bot-help.html", $dest);
+      my $cssorig = catfile("data-files", "arsinoe.css");
       my $cssdest = catfile($$pubdir{value}, "arsinoe.css");
       if (yesno("Also copy sample stylesheet to $cssdest?")) {
-        system("cp", "arsinoe.css", $cssdest);
+        system("cp", $cssorig, $cssdest);
       }
     }
   }
