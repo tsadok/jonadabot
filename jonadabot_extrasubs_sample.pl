@@ -120,14 +120,29 @@ our %routine = (
                     }
                   }
                 },
-                foodservice   => sub { # makes a good custom trigger, e.g., a !food trigger
+                foodservice   => sub {
                   my ($trigger, %arg) = @_;
+                  logit("foodservice($trigger)");
                   $trigger =~ s/e?s$//;
-                  $trigger =~ s/hotdog|burger|hamburger|taco|burrito|wrap/sandwich/;
-                  $trigger =~ s/cookie|cake|cupcake|pie|muffin|fudge|brownies/dessert/;
-                  my @food = (qw(pizza sandwich dessert pizza sandwich milk sushi));
+                  $trigger =~ s/(hotdog|burger|hamburger|taco|burrito|wrap)/sandwich/;
+                  $trigger =~ s/(cookie|cake|cupcake|pie|muffin|fudge|browni)e?s?/dessert/;
+                  my @food = (qw(pizza sandwich dessert pizza sandwich milk sushi friedfood));
                   $trigger =~ s/^food/$food[int rand rand @food]/e;
-                  my %bev = (dessert => +{ quantity => ['', 'a dish of', 'a saucer of', 'a plate of', ''],
+                  my %bev = (friedfood => +{ quantity => ['', 'a plate of', 'a basket of'],
+                                             quality  => ['', 'fresh', 'hot', 'leftover'],
+                                             theitem  => ['hash browns', 'chips', 'homefries', 'french fries',
+                                                          'waffle fries', 'curly fries', 'sweet potato fries',
+                                                          'fried cheese sticks', 'fish sticks', 'fried chicken fingers',
+                                                          'deep fried twinkies', 'deep fried candy bars',
+                                                          'fried eggrolls', 'deep-fried mushrooms', 'deep-fried broccoli',
+                                                          'potato cakes', 'latkesim'],
+                                             sweeten  => [''],
+                                             flavors  => [''],
+                                             toppings => ['cheddar cheese', 'lots and lots of salt', 'garlic salt',
+                                                          'mozzarella', 'provalone',
+                                                         ],
+                                           },
+                             dessert => +{ quantity => ['', 'a dish of', 'a saucer of', 'a plate of', ''],
                                            quality  => ['', 'hot', 'fresh', ''],
                                            theitem  => ['chocolate cake', 'chocolate-chip cookies', 'pumpkin pie', 'cupcakes',
                                                         'brownies', 'fudge brownies', 'mint brownies', 'chocolate fudge',
@@ -140,7 +155,8 @@ our %routine = (
                                                        ],
                                            sweeten  => [''],
                                            flavors  => [''], # baked in
-                                           toppings => ['', '', '', 'vanilla ice cream'],
+                                           toppings => ['', '', '', '', 'vanilla ice cream', 'vanilla ice cream',
+                                                        'chocolate', 'hot fudge', 'nuts', 'marshmallow fluff', 'mirengue'],
                                          },
                              milk => +{ quantity => ['a glass of', 'a tall glass of', 'a small glass of', ''],
                                         quality  => ['', '', 'cold', 'cold', 'hot', 'warm', 'condensed'],
@@ -154,11 +170,11 @@ our %routine = (
                                          theitem  => ['pizza'],
                                          sweeten  => [''],
                                          flavors  => ['', '', 'garlic', 'basil', 'oregano', 'habanero pepper seed extract',],
-                                         toppings => ['pepperoni', 'mushroom', '', 'sausage', 'bacon', 'pineapple', 'ham',
+                                         toppings => ['pepperoni', 'mushrooms', '', 'sausage', 'bacon', 'pineapple', 'ham',
                                                       'olives', 'bell peppers', 'onions', 'hot peppers', 'chicken',
                                                       'broccoli', 'mayonnaise', 'corn', 'tuna', 'seaweed', # Pizza Hut Japan has all the ones on this line on their menu.  Really.
                                                      ],
-                                         majortopping => 'tomato sauce, mozzarella cheese,',
+                                         majortopping => ((rand(100)>12) ? 'tomato sauce, mozzarella cheese,' : 'white sauce, mozzarella cheese,'),
                                        },
                              sushi => +{ quantity => ['', 'a plate of', ''],
                                          quality  => ['vegetarian', 'vegan', 'heavily Americanized'],
@@ -186,18 +202,33 @@ our %routine = (
                                                         ],
                                           },
                             );
-                  return "/me serves up " . (join " ", grep { $_ } map {
+                  logit("foodservice revised trigger: $trigger");
+                  my @clause = map {
                     my $k = $_;
+                    logit("foodservice key: $k", 4);
                     my $choice = $bev{$trigger}{$k}[int rand rand @{$bev{$trigger}{$k}}];
+                    logit("choice: $choice", 5);
                     my $clause = $choice;
                     if ($k eq 'sweeten')  { $clause = "sweetened with $choice" if $choice; }
                     if ($k eq 'flavors')  { $clause = "flavored with $choice" if $choice; }
                     if ($k eq 'toppings') {
-                      my $major = $bev{$trigger}{$k}{majortopping} ? "$bev{$trigger}{$k}{majortopping} and " : "";
+                      my $major = '';
+                      if ((exists $bev{$trigger}{majortopping}) and (defined $bev{$trigger}{majortopping})) {
+                        $major = "$bev{$trigger}{majortopping} and ";
+                        logit("major: $major", 6);
+                      }
                       $clause = "topped with $major$choice" if $choice;
                     }
+                    logit("clause: $clause", 6);
                     $clause;
-                  } qw(quantity quality theitem sweeten flavors toppings)) . ".";
+                  } qw(quantity quality theitem sweeten flavors toppings);
+                  logit("foodservice clauses: " . @clause . ".", 3);
+                  @clause = grep { $_ } @clause;
+                  logit("foodservice non-empty clauses: " . @clause . ".", 3);
+                  logit("foodservice clause: $_", 4) for @clause;
+                  my $answer = "/me serves up " . (join " ", @clause) . ".";
+                  logit("foodservice returning: $answer");
+                  return $answer;
                 },
                 congrats => sub { # useful as followup from a logfile regex callback
                   my ($player, $item) = @_;
