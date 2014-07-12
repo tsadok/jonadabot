@@ -3,10 +3,13 @@
 
 our $cfgprofile = ((grep { $_ } map { /^cfgprofile=(\w+)/; $1 } @ARGV), 'jonadabot')[0];
 print "Using config profile: $cfgprofile\n";
+our $network    = findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1 );
+die "No enabled IRC network record found." if not ref $network;
+print "Using configuration for the $$network{networkname} network (ID:$$network{id}).";
 
 do "jonadabot_db.pl";
 
-my @color = getconfigvar($cfgprofile, 'nickcolor');
+my @color = getconfigvar($cfgprofile, $$network{id}, 'nickcolor');
 
 print "Loaded " . @color . " colors.\n";
 

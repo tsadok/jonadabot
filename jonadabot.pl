@@ -140,26 +140,43 @@ for my $log (@log) { # X means disabled.
 }
 warn "Stage " . (shift @stage) . " (opened pipes)";
 
-our $condvar = AnyEvent->condvar;
-our $timer;
-our $irc = new AnyEvent::IRC::Client;
-warn "Stage " . (shift @stage) . " (created IRC client)";
-$irc->reg_cb (connect => sub {
+# TODO: use the condvars for each IRC network; it should be possible for
+#       a master trigger to result in their being sent;l when received,
+#       the connection to that network should be disconnected and then
+#       reconnected.  The shutdown sequence, then, should reap all of
+#       them, to get rid of the ugly kill $$ hack we are currently using.
+#       A global flag var set by !shutdown can prevent the reconnects.
+
+for my $ircnet (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1)) {
+  my $netid = $$ircnet{id};
+  $irc{$netid}{condvar}      = AnyEvent->condvar;
+  $irc{$netid}{networkname}  = $$ircnet{networkname};
+  $irc{$netid}{networkflags} = $$ircnet{flags};
+  $irc{$netid}{client}       = new AnyEvent::IRC::Client;
+
+  our $timer; # TODO: Does this need to be per-network?
+
+  warn "Stage " . (shift @stage) . " (created IRC client for network $netid, $irc{$netid}{networkname})";
+  my $irc = $irc{$netid}{client};
+  $irc->reg_cb (connect => sub {
                 my ($con, $err) = @_;
-                logit("Callback: connect (preparing to register nick)");
+                logit("Callback: connect (preparing to 'register' nick on $irc{$netid}{networkname})");
                 if (defined $err) {
                   error("connect", $err);
+                  $irc{$netid}{condvar}->send();
                   exit 1;
                 } else {
-                  my @nick = getconfigvar($cfgprofile, "ircnick");
-                  my $user = getconfigvar($cfgprofile, "ircusername");
-                  my $pass = getconfigvar($cfgprofile, "ircpassword");
-                  my $real = getconfigvar($cfgprofile, "ircrealname");
-                  $irc = $con; # Not sure if this is necessary or prudent.
-                  $irc->register($nick[0], $user, $real, $pass); # This IS necessary.  Every time.
-                  # The register() method is misnamed.  It doesn't
-                  # register a new account.  It's more like logging
-                  # in, only without any authentication.  That's next:
+                  my @nick = getconfigvar($cfgprofile, $netid, "ircnick");
+                  my $user = getconfigvar($cfgprofile, $netid, "ircusername");
+                  my $pass = getconfigvar($cfgprofile, $netid, "ircpassword");
+                  my $real = getconfigvar($cfgprofile, $netid, "ircrealname");
+                  $irc{$netid}{client} = $irc = $con; # Not sure if this is necessary.
+                  $irc->register($nick[0], $user, $real, $pass);
+                  # For historical reasons, the register() method appears misnamed, from a modern
+                  # perspective.  It doesn't register a new account with services.  (Early IRC
+                  # networks didn't even have such things.)  You have to do it every time you
+                  # connect.  It's rather like logging in, only without any authentication.
+                  # The authentication step, then, is next:
                   select undef, undef, undef, 0.1;
                   my $nsrv = scalar getconfigvar($cfgprofile, "ircnickserv");
                   $irc->send_srv( PRIVMSG => ($nsrv),

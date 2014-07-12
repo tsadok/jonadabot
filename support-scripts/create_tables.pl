@@ -7,6 +7,7 @@ our $defaultnick      = "jonadabot_" . 65535 + int rand 19450726;
 do  $dbcode;
 do  $utilsubs;
 our $cfgprofile       = askuser("Enter a short identifier for your configuration profile (default: jonadabot)") || 'jonadabot';
+our $ircnetworkname   = askuser("Enter the name of the IRC network you wish to configure (default: freenode)")  || 'freenode';
 
 use File::Spec::Functions;
 
@@ -16,10 +17,20 @@ my $db = dbconn();
 # Basic tables used for fundamental functionality of the IRC bot: #
 ###################################################################
 
+# list of IRC networks:
+my $q = $db->prepare("CREATE TABLE IF NOT EXISTS ircnetwork (
+    id                integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    cfgprofile        tinytext,
+    networkname       tinytext,
+    enabled           integer,
+    flags             tinytext
+)");
+
 # configuration variables:
 my $q = $db->prepare("CREATE TABLE IF NOT EXISTS config (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      cfgprofile tinytext,
+    networkid         integer,
      enabled    integer,
      varname    tinytext,
      value      text)");
@@ -28,6 +39,7 @@ $q->execute();
 # individual IRC users' preferences:
 my $q = $db->prepare("CREATE TABLE IF NOT EXISTS userpref (
      id           integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
      username     tinytext,
      prefname     tinytext,
      value        text)");
@@ -44,6 +56,7 @@ $q->execute();
 # messages for individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS memorandum (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
      sender     tinytext,
      channel    tinytext,
      target     tinytext,
@@ -56,6 +69,7 @@ $q->execute();
 # when various IRC users were last seen:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS seen (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
      nick       tinytext,
      channel    tinytext,
      whenseen   datetime,
@@ -66,6 +80,7 @@ $q->execute();
 # alarms set by individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS alarm (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
      status     integer,
      nick       tinytext,
      sender     tinytext,
@@ -81,6 +96,7 @@ $q->execute();
 # recurring alarms set by individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS recurringalarm(
      id          integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
      nick        tinytext,
      sender      tinytext,
      setdate     datetime,
@@ -97,6 +113,8 @@ $q->execute();
 
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS bottrigger (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
+    channel           tinytext,
      bottrigger    tinytext,
      answer        tinytext,
      enabled       integer,
@@ -107,6 +125,7 @@ $q->execute();
 
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS backscroll (
      id             integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    networkid         integer,
      channel        tinytext,
      number         integer,
      whensaid       datetime,
@@ -129,6 +148,7 @@ $q->execute();
 # POP3 mailboxes:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS popbox (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    ircnetworkid      integer,
      ownernick  tinytext,
      address    tinytext,
      popuser    tinytext,
@@ -175,6 +195,7 @@ $q->execute();
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS smsmnemonic (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      destination   integer,
+    ircnetworkid      integer,
      ircnick       tinytext,
      mnemonic      tinytext,
      bcc           tinytext,
@@ -201,6 +222,7 @@ $q->execute();
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS emailcontact (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      mnemonic      tinytext,
+    ircnetworkid      integer,
      ircnick       tinytext,
      emaildest     integer,
      signature     tinytext,
@@ -212,6 +234,7 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS mailqueue (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      tofield       tinytext,
      fromfield     tinytext,
+    ircnetworkid      integer,
      nick          tinytext,
      subject       tinytext,
      bcc           tinytext,
@@ -224,6 +247,7 @@ $q->execute();
 # Notifications about incoming mail that biff has noticed:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS notification (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    ircnetworkid      integer,
      usernick      tinytext,
      enqueued      datetime,
      dequeued      datetime,
@@ -249,6 +273,7 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS logfilewatch (
      logfile      integer,
      matchstring  tinytext,
      isregexkey   integer,
+    ircnetworkid      integer,
      nicktomsg    tinytext,
      msgprefix    tinytext,
      channel      tinytext,
@@ -281,6 +306,7 @@ $q->execute();
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS clanmembernick (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      memberid   integer,
+    ircnetworkid      integer,
      nick       tinytext,
      prio       integer)");
 $q->execute();
@@ -333,7 +359,7 @@ my @var = (
            ['defaultoperator'      => '', "Nick on the IRC network for the bot's primary human operator"],
            ['master'               => [], "Nick of a person who can send the bot privileged commands"],
            ['maxlines'             => 10, "Maximum number of lines to return at once when answering a trigger"],
-           ['pingbot'              => ['Arsinoe', 'kotsovidalv'], "Other bot that will respond to /msg !ping to reset our timer"],
+           ['pingbot'              => ['Arsinoe', 'kstukri'], "Other bot that will respond to /msg !ping to reset our timer"],
            ['pingtimelimit'        => [15, 30, 45, 60], "Number of seconds of no channel activity before pinging"],
            ['sibling'              => [], "Other instance of $devname run by the same operator; they help keep tabs on one another"],
            ['ircchannel'           => [], "IRC channel to always connect to on startup"],
@@ -344,9 +370,25 @@ my @var = (
            ['pubdiruri'            => 'http://www.example.com/jonadabot', "Public URL pointing to the same directory as pubdirpath"],
           );
 my $questionsasked = 0;
+
+my %networkdefault = ( # TODO: add sane defaults for the major networks:
+                      freenode => +{ ircserver => 'chat.freenode.net', },
+                     );
+
+my $network = findrecord("ircnetwork", cfgprofile => $cfgprofile, networkname => $ircnetworkname );
+if (not ref $network) {
+  addrecord("ircnetwork", +{ cfgprofile  => $cfgprofile,
+                             networkname => $ircnetworkname,
+                             enabled     => 1,
+                           });
+  $network = findrecord("ircnetwork", cfgprofile => $cfgprofile, networkname => $ircnetworkname );
+  ref $network or die "Failed to create ircnetwork record for $ircnetworkname";
+}
+
 for my $var (@var) {
   my ($varname, $default, $question) = @$var;
-  if (not getconfigvar($cfgprofile, $varname)) {
+  $default = $networkdefault{$ircnetworkname} || $default;
+  if (not getconfigvar($cfgprofile, $$network{id}, $varname)) {
     print "I may ask you some basic config questions.  Try to answer as best you can;\nbut don't worry: you can easily change your answers later in the config table in the database.\n\n"
       if not $questionsasked++;
     if (ref $default) {
@@ -357,20 +399,23 @@ for my $var (@var) {
         my $dfltnote = $dflt ? qq[ (default: $dflt)] : '';
         my $answer   = askuser("$question$dfltnote") || $dflt;
         if ($answer) {
-          addrecord('config', +{ cfgprofile => $cfgprofile, varname => $varname, enabled => 1, value => ($answer || $dflt) });
+          addrecord('config', +{ cfgprofile => $cfgprofile, networkid => $$network{id},
+                                 varname => $varname, enabled => 1, value => ($answer || $dflt) });
         } else {
           $done++;
         }
       }
     } else {
       my $dfltnote = $default ? qq[ (default: $default)] : '';
-      addrecord('config', +{ cfgprofile => $cfgprofile, varname => $varname, enabled => 1, value   => (askuser("$question$dfltnote") || $default) });
+      addrecord('config', +{ cfgprofile => $cfgprofile, networkid => $$network{id},
+                             varname => $varname,       enabled => 1,
+                             value   => (askuser("$question$dfltnote") || $default) });
     }
   }
 }
 my $helporig = catfile("data-files", "bot-help.html");
 if (-e $helporig) { # we appear to have been run from the jonadabot dir
-  for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
+  for my $pubdir (getconfigvar($cfgprofile, $$network{id}, "pubdirpath")) {
     my $dest = catfile($pubdir, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
       system("cp", $helporig, $dest);
@@ -397,7 +442,8 @@ if ((not getrecord("popserver")) and (yesno("Do you wish to set up email-related
         my $address  = askuser("Email address corresponding to $popuser on $serveraddress");
         my $owner    = askuser("IRC nick of user who owns this email account");
         my $mnemonic = askuser("Short mnemonic $owner can use to refer to this email account");
-        addrecord("popbox", +{ ownernick  => $owner,
+        addrecord("popbox", +{ ownernick    => $owner,
+                               ircnetworkid => $$network{id},
                                address    => $address,
                                popuser    => $popuser,
                                poppass    => $poppass,
@@ -444,7 +490,8 @@ if ((not getrecord("popserver")) and (yesno("Do you wish to set up email-related
           my $ircnick  = askuser("IRC nick of user who can use this mnemonic to send to this SMS target");
           my $mnemonic = askuser("Short identifier $ircnick can use to refer to this SMS target");
           addrecord("smsmnemonic", +{ destination => $destid,
-                                      ircnick     => $ircnick,
+                                      ircnetworkid => $$network{id},
+                                      ircnick      => $ircnick,
                                       mnemonic    => $mnemonic, });
           $anothermnemonic = "another";
         }
@@ -475,6 +522,7 @@ if (not getrecord("logfile")) {
       addrecord("logfilewatch", +{ logfile     => $lfid,
                                    matchstring => $matchstring,
                                    isregexkey  => (($isregexkey) ? 1 : 0),
+                                   ircnetworkid => $$network{id},
                                    nicktomsg   => $nicktomsg,
                                    msgprefix   => $msgprefix,
                                    channel     => $channel,

@@ -56,26 +56,27 @@ sub dbconn {
 }
 
 sub getconfigvarordie {
-  my ($p, $v) = @_;
+  my ($p, $n, $v) = @_;
   if (wantarray) {
     my @answer = getconfigvar(@_);
-    croak "You MUST configure at least one value for config variable $v in profile $p" if not @answer;
+    croak "You MUST configure at least one value for config variable $v for network $n in profile $p" if not @answer;
     return @answer;
   } else {
     my $answer = getconfigvar(@_);
-    croak "You MUST configure a value for config variable $v in profile $p" if not $answer;
+    croak "You MUST configure a value for config variable $v for network $n in profile $p" if not $answer;
     return $answer;
   }
 }
 sub getconfigvar {
-  my ($profile, $varname) = @_;
-  my @cfgvar = findrecord('config', 'cfgprofile', $profile, 'varname', $varname, 'enabled', 1);
+  my ($profile, $network, $varname) = @_;
+  my @cfgvar = findrecord('config', 'cfgprofile', $profile, networkid => $network,
+                          'varname', $varname, 'enabled', 1);
   if (wantarray) {
     return map { $$_{value} } @cfgvar;
   } elsif (1 >= scalar @cfgvar) {
     return $cfgvar[0]{value};
   } else {
-    warn "Too many enabled config values for $varname in profile $profile, only the first will be used.";
+    warn "Too many enabled config values for $varname for network $network in profile $profile, only the first will be used.";
     return $cfgvar[0]{value};
   }
 }
