@@ -69,7 +69,7 @@ our %friendlytzname   = ('America/New_York'    => [ 'EST', 'EDT'  ], # This is t
 our $startuptime      = DateTime->now(@tz);
 
 
-my @stage = ("'Aleph", qw(Beth Gimmel Daleth He Waw Zayin Heth Teth Yodh Kaph Lamedh Mem Nun Samekh), "`Ayin", qw(Pe Tsadhe Qoph Resh Sin Shin Taw));
+my @stage = ("'Aleph", qw(Beth Gimmel Daleth He Waw Zayin Heth Teth Yodh Kaph Lamedh Mem Nun Samekh), "`Ayin", qw(Pe Tsadhe Qoph Resh Sin Shin Taw Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda Mu Nu Xi Omicron Pi Rho Sigma Tau Upsilon Phi Chi Psi Omega));
 warn "Stage " . (shift @stage);
 our (%watchregex); # Populated with regexes by jonadabot_regexes.pl, which each installation must supply (there's a sample).
 do $utilsubs;  warn "Stage " . (shift @stage) . " (did utilsubs)";
@@ -163,7 +163,7 @@ for my $ircnet (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1
                 logit("Callback: connect (preparing to 'register' nick on $irc{$netid}{networkname})");
                 if (defined $err) {
                   error("connect", $err);
-                  $irc{$netid}{condvar}->send();
+                  $irc{$netid}{condvar}->broadcast();
                   exit 1;
                 } else {
                   my @nick = getconfigvar($cfgprofile, $netid, "ircnick");
@@ -178,52 +178,41 @@ for my $ircnet (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1
                   # connect.  It's rather like logging in, only without any authentication.
                   # The authentication step, then, is next:
                   select undef, undef, undef, 0.1;
-                  my $nsrv = scalar getconfigvar($cfgprofile, "ircnickserv");
+                  my $nsrv = scalar getconfigvar($cfgprofile, $netid, "ircnickserv");
                   $irc->send_srv( PRIVMSG => ($nsrv),
-                                  "identify " . getconfigvar($cfgprofile, "ircpassword"),
+                                  "identify " . getconfigvar($cfgprofile, $netid "ircpassword"),
                                 ); # This is the authentication step.
                   select undef, undef, undef, 0.1;
-                  if ($debug{groupnick}) {
-                    for my $nick (reverse @nick) {
-                      $irc->send_srv( NICK => $nick, );
-                      select undef, undef, undef, 0.1;
-                      $irc->send_srv( PRIVMSG => $nsrv, "identify $user $pass", );
-                      select undef, undef, undef, 0.1;
-                      $irc->send_srv( PRIVMSG => $nsrv, "GROUP", );
-                      select undef, undef, undef, 0.1;
-                    }
-                  } else {
-                    my $nick = $nick[0];
-                    $irc->send_srv( NICK => $nick, );
-                      select undef, undef, undef, 0.1;
-                  }
-                  $irc->send_srv( PRIVMSG => $_, "I'm in ($$).", )
-                    for uniq(getconfigvar($cfgprofile, "defaultoperator"),
-                             getconfigvar($cfgprofile, "operator"));
+                  my $nick = $nick[0];
+                  $irc->send_srv( NICK => $nick, );
                   select undef, undef, undef, 0.1;
-                  for my $chan (getconfigvar($cfgprofile, "ircchannel")) {
+                  $irc->send_srv( PRIVMSG => $_, "I'm in ($$).", )
+                    for uniq(getconfigvar($cfgprofile, $netid, "defaultoperator"),
+                             getconfigvar($cfgprofile, $netid, "operator"));
+                  select undef, undef, undef, 0.1;
+                  for my $chan (getconfigvar($cfgprofile, $netid, "ircchannel")) {
                     $irc->send_srv( JOIN => $chan );
                     select undef, undef, undef, 0.1;
                   }
                   settimer();
                 }
               });
-warn "Stage " . (shift @stage) . " (connected to IRC)";
-$irc->reg_cb (registered => sub { logandprint("I'm in ($$)!\n"); });
-$irc->reg_cb (disconnect => sub { logandprint("I'm out ($$)!\n");
-                                  $condvar->broadcast; exit 1; });
+  warn "Stage " . (shift @stage) . " (connected to $irc{$netid}{networkname})";
+  $irc->reg_cb (registered => sub { logandprint("I'm in ($$)!\n"); });
+  $irc->reg_cb (disconnect => sub { logandprint("I'm out ($$)!\n");
+                                    $irc{$netid}{condvar}->send; exit 1; });
 
-$irc->reg_cb (channel_add => sub { my ($client, $msg, $channel, @nick) = @_;
-                                   addnicktochannel($channel, @nick); });
-$irc->reg_cb (channel_remove => sub { my ($client, $msg, $channel, @nick) = @_;
-                                      removenickfromchannel($channel, @nick); });
-$irc->reg_cb (channel_change => sub { my ($client, $msg, $channel, $old, $new, $isme) = @_;
-                                      # TODO: track aliases in the database, maybe use whois to determine canonicality
-                                      $irc{channel}{lc $channel}{alias}{$new}{$old}++;
-                                      $irc{channel}{lc $channel}{alias}{$old}{$new}++;
-                                      addnicktochannel($channel, $new);
-                                      removenickfromchannel($channel, $old);
-                                    });
+  $irc->reg_cb (channel_add => sub { my ($client, $msg, $channel, @nick) = @_;
+                                     addnicktochannel($netid, $channel, @nick); });
+  $irc->reg_cb (channel_remove => sub { my ($client, $msg, $channel, @nick) = @_;
+                                        removenickfromchannel($netid, $channel, @nick); });
+  $irc->reg_cb (channel_change => sub { my ($client, $msg, $channel, $old, $new, $isme) = @_;
+                                        # TODO: track aliases in the database, maybe use whois to determine canonicality
+                                        $irc{$netid}{channel}{lc $channel}{alias}{$new}{$old}++;
+                                        $irc{$netid}{channel}{lc $channel}{alias}{$old}{$new}++;
+                                        addnicktochannel($netid, $channel, $new);
+                                        removenickfromchannel($netid, $channel, $old);
+                                      });
 $irc->reg_cb (privatemsg => sub {
                 my ($client, $nick, $ircmessage )= @_;
                 logit("Callback: privatemsg") if $debug{irc} > 3;
@@ -233,10 +222,10 @@ $irc->reg_cb (privatemsg => sub {
                               }) if $debug{privatemsg} > 5;
                 my ($recipient, $text) = @{$$ircmessage{params}};
                 logit("Private Message from $$ircmessage{prefix}: $text", 1) if $debug{privatemsg} > 1;
-                handlemessage($$ircmessage{prefix}, $text, 'private');
+                handlemessage($client, $netid, $$ircmessage{prefix}, $text, 'private');
               });
 $irc->reg_cb (error => sub { my ($client, $code, $msg, $ircmsg) = @_;
-                             logit("Callback: error") if $debug{irc} > 3;
+                             logit("Callback: error ($code) on network $netid") if $debug{irc} > 3;
                              my $name = AnyEvent::IRC::Util::rfc_code_to_name($code);
                              error(qq[$code, $name], $msg);
                            });
@@ -249,61 +238,65 @@ $irc->reg_cb(publicmsg => sub { my ($client, $channel, $ircmsg) = @_;
                                               }) if $debug{publicmsg} > 5;
                                 my $text;
                                 ($channel, $text) = @{$$ircmsg{params}};
-                                handlemessage($$ircmsg{prefix}, $text, $channel);
+                                handlemessage($client, $netid, $$ircmsg{prefix}, $text, $channel);
              });
-$irc->reg_cb(ctcp => sub { my ($src, $target, $tag, $msg, $type, $blah) = @_;
+$irc->reg_cb(ctcp => sub { my ($client, $src, $target, $tag, $msg, $type) = @_;
                            logit("Callback: ctcp") if $debug{irc} > 3;
-                           handlectcp($src, $target, $tag, $msg, $type, $blah);
+                           handlectcp($client, $netid, $src, $target, $tag, $msg, $type);
              });
 
-warn "Stage " . (shift @stage) . " (registered callbacks)";
+warn "Stage " . (shift @stage) . " (registered callbacks on network $netid)";
 
-my $serv = getconfigvar($cfgprofile, "ircserver")     || 'irc.freenode.net';
-my $port = getconfigvar($cfgprofile, "ircserverport") || 6667;
-my @nick = getconfigvar($cfgprofile, "ircnick")       || $defaultusername;
-my $user = getconfigvar($cfgprofile, "ircusername")   || $defaultusername;
-my $real = getconfigvar($cfgprofile, "ircrealname")   || qq[anonymous irc bot operator];
-my $pass = getconfigvar($cfgprofile, "ircpassword")   || shadigest(join "|", $0, $cfgprofile, $serv, @nick, $user, $real);
+my $serv = getconfigvar($cfgprofile, $netid, "ircserver")     || 'irc.freenode.net';
+my $port = getconfigvar($cfgprofile, $netid, "ircserverport") || 6667;
+my @nick = getconfigvar($cfgprofile, $netid, "ircnick")       || $defaultusername;
+my $user = getconfigvar($cfgprofile, $netid, "ircusername")   || $defaultusername;
+my $real = getconfigvar($cfgprofile, $netid, "ircrealname")   || qq[anonymous irc bot operator];
+my $pass = getconfigvar($cfgprofile, $netid, "ircpassword")   || shadigest(join "|", $0, $cfgprofile, $serv, @nick, $user, $real);
 
 our @identification = (nick     => $nick[0],
                        user     => $user,
                        real     => $real,
                        password => $pass);
-logit("Connecting (cfgprofile: $cfgprofile; server: $serv; port: $port; idenfication: @identification)")
+logit("Connecting (cfgprofile: $cfgprofile; netid: $netid; server: $serv; port: $port; idenfication: @identification)")
   if $debug{connect};
 $irc->connect($serv, $port, { @identification });
 warn "Stage " . (shift @stage) . " (connected/waiting)";
-logit("Waiting");
-$condvar->wait;
-logit("Waited");
+}
+logit("Waiting for all condvars to send...");
+for my $netid (grep { /^\d+$/ } keys %irc) {
+  $irc{$netd}{condvar}->recv;
+}
+logit("Done waiting; all condvars are in.");
 warn "Stage " . (shift @stage) . " (waited)";
 
-while (not $irc->registered()) {
-  jot("?");
-  select undef, undef, undef, 0.25;
-  die "Unable to register nick." if $jotcount > 100;
-}
-warn "Stage " . (shift @stage) . ' ("registered" nick)';
-
-for our $chan (@{$irc{chan}}) { # This is probably redundant.
-  logandprint("Attempting to join $chan");
-  $irc->send_srv( "JOIN", $chan );
-}
-warn "Stage " . (shift @stage) . " (joined channels)";
-
-our $loopcount = 98;
-while (1) {
-  if (not ++$loopcount % 200) {
-    jot();
-  }
-  select undef, undef, undef, 0.15;
-}
-
-warn "Stage " . (shift @stage) . " (exited while loop)";
-$condvar->wait();
-warn "Stage " . (shift @stage) . " (waited again)";
-$irc->disconnect();
-warn "Stage " . (join "", map { $_ . " (disconnected)" . $/ } @stage);
+#while (not $irc->registered()) {
+#  jot("?");
+#  select undef, undef, undef, 0.25;
+#  die "Unable to register nick." if $jotcount > 100;
+#}
+#warn "Stage " . (shift @stage) . ' ("registered" nick)';
+#
+#for our $chan (@{$irc{chan}}) { # This is probably redundant.
+#  logandprint("Attempting to join $chan");
+#  $irc->send_srv( "JOIN", $chan );
+#}
+#warn "Stage " . (shift @stage) . " (joined channels)";
+#
+#our $loopcount = 98;
+#while (1) {
+#  if (not ++$loopcount % 200) {
+#    jot();
+#  }
+#  select undef, undef, undef, 0.15;
+#}
+#
+#warn "Stage " . (shift @stage) . " (exited while loop)";
+#$condvar->wait();
+#warn "Stage " . (shift @stage) . " (waited again)";
+#$irc->disconnect();
+warn "Stage " . (join "", map { $_ . " (disconnected, exiting)" . $/ } @stage);
+exit 0;
 
 sub shadigest {
   my (@input) = @_;

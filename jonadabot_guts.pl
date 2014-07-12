@@ -73,7 +73,7 @@ sub loadconfig {
           opers   => [uniq(getconfigvar($cfgprofile, 'defaultoperator'),
                            getconfigvar($cfgprofile, 'operator')),
                       # All active GROUPed nicks for primary bot operator.
-                      # Currently this doesn't do much, but in a
+                      # Currently this doesn't do very much, but in a
                       # future version the bot will look for you and
                       # find which nick you are using if you are
                       # online.
@@ -407,22 +407,20 @@ sub greeting { # punctuation may be added automatically, so don't include it
   return $g[int rand rand int rand @g];
 }
 sub addnicktochannel {
-  my ($ch, @n) = @_;
-  $irc{channel}{lc $ch}{nicks} = [ sort { $a cmp $b
-                                     } uniq(@n, @{$irc{channel}{lc $ch}{nicks}}) ];
-  #my $now = DateTime->now( @tz );
-  #$irc{channel}{lc $ch}{seen}{lc $_} = $now for @n;
-  if (($irc{okdom}{$ch}) and (rand(100)<(getconfigvar($cfgprofile, 'hellochance') || 27))) {
+  my ($nid, $ch, @n) = @_;
+  $irc{$nid}{channel}{lc $ch}{nicks} = [ sort { $a cmp $b
+                                              } uniq(@n, @{$irc{$nid}{channel}{lc $ch}{nicks}}) ];
+  if (($irc{$nid}{okdom}{$ch}) and (rand(100)<(getconfigvar($cfgprofile, $nid, 'hellochance') || 27))) {
     say((join ", ", greeting(), @n),
-        channel => $channel, sender => $n[0]);
+        network => $nid, channel => $channel, sender => $n[0]);
   }
 }
 sub removenickfromchannel {
-  my ($ch, @n) = @_;
+  my ($nid, $ch, @n) = @_;
   my %remove = map { $_ => 1 } @n;
-  $irc{channel}{lc $ch}{nicks} = [ grep {
+  $irc{$nid}{channel}{lc $ch}{nicks} = [ grep {
     not $remove{$_}
-  } @{$irc{channel}{lc $ch}{nicks}} ];
+  } @{$irc{$nid}{channel}{lc $ch}{nicks}} ];
 }
 
 sub parseprefix { # This function needs work.  I'm still finding cases it
@@ -624,7 +622,7 @@ sub debuginfo {
 }
 
 sub handlectcp {
-  my ($self, $sender, $target, $tag, $msg, $type) = @_;
+  my ($client, $netid, $sender, $target, $tag, $msg, $type, $netid) = @_;
   my $respond = 0;
   logit("handlectcp(self, $sender, $target, $tag, $msg, $type)") if $debug{ctcp};
   updatepingtimes($sender, 'ctcp', $tag);
@@ -699,7 +697,7 @@ sub handlectcp {
 }
 
 sub handlemessage {
-  my ($prefix, $text, $howtorespond) = @_;
+  my ($client, $netid, $prefix, $text, $howtorespond) = @_;
   # howtorespond should either be 'private' or a channel
   # The prefix is raw, as received by the callback.
   my $sender = parseprefix($prefix, qq[handlemessage('$prefix', '$text', '$howtorespond')]) || '__NO_SENDER__';
