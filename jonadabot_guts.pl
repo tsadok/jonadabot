@@ -397,7 +397,7 @@ sub checkpingtimes {
     return if $limit > $now;
     logit("Past ping limit ($lim seconds), pinging $bot");
     my $pingcmd = getconfigvar($cfgprofile, qq[customping_$bot]) || "!ping";
-    say("!ping", networkid => $$network{id}, channel => 'private', sender => $bot);
+    say($pingcmd, networkid => $$network{id}, channel => 'private', sender => $bot);
     push @bot, $bot;
   }
    # TODO: Rather than restarting everything, try just disconnecting/reconnecting the problem network.
