@@ -1,0 +1,13 @@
+
+This code is in the public domain, because it has been released into
+the public domain by its author.
+
+In case there are jurisdictions where (contrary to all common sense)
+this is not legally possible, the code is also offered under a license
+that allows it to be used, modified, and redistributed without any
+copyright restrictions.
+
+Other laws that are not related to copyright still apply as usual, of
+course; and the original author of the software accepts no
+responsibility for actions taken by third parties.  We are each
+responsible for our own actions (and those of our own bots).
