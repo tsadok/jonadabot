@@ -24,7 +24,7 @@ our %debug = ( # These are the default defaults...
             );
 # But we can override them with values from the DB:
 sub loaddebuglevels {
-  for my $dflt (getconfigvar($cfgprofile, "debug")) {
+  for my $dflt (getconfigvar($cfgprofile, undef, "debug")) {
     my ($k, $v) = split /[=]/, $dflt;
     $debug{$k} = $v || $debug{$k};
   }
@@ -37,7 +37,7 @@ loaddebuglevels();
                );
 sub loadprefdefaults {
   for my $k (keys %prefdefault) { # The default set in the database overrides the hardcoded one:
-    $prefdefault{$k} = getconfigvar($cfgprofile, "default$k") || $prefdefault{$k};
+    $prefdefault{$k} = getconfigvar($cfgprofile, undef, "default$k") || $prefdefault{$k};
   } # And of course that in turn is overridden by user preference, on a per-user basis.
 }
 loadprefdefaults();
@@ -49,50 +49,51 @@ my $ourclan;
        );
 
 sub loadconfig {
-  $ourclan = getconfigvar($cfgprofile, 'clan') || 'demilichens';
-  %irc = (
-          %irc, # preserve things that aren't specifically loaded, e.g., $irc{channel}
-          server  => getconfigvar($cfgprofile, 'ircserver') || 'irc.freenode.net',
-          port    => getconfigvar($cfgprofile, 'ircserverport') || 6667,
-          nick    => [ getconfigvar($cfgprofile, 'ircnick'), $defaultusername ],
-          nsrv    => getconfigvar($cfgprofile, 'ircnickserv') || 'NickServ',
-          user    => getconfigvar($cfgprofile, 'ircusername') || $defaultusername,
-          real    => ("" . getconfigvar($cfgprofile, 'ircrealname') || "anonymous ircbot operator") . ", represented by $devname",
-          pass    => getconfigvar($cfgprofile, 'ircpassword') || 'm2RTLVG8iwm3onyNzFXSu0kOYFtdlGB5Nct',
-          email   => getconfigvar($cfgprofile, 'ircemailaddress'),
-          clan    => $ourclan,
-          demi    => [ getclanmemberlist($ourclan) ],
-          chan    => ['#bot-test',
-                      #'#bot-testing',
-                      #'#bottesting',
-                      getconfigvar($cfgprofile, 'ircchannel'),
-                     ],
-          okdom   => +{ map { $_ => 1 } (getconfigvar($cfgprofile, 'ircchanokdom'), 'private')}, # channels it's ok to dominate
-          silent  => +{ map { $_ => 1 } (getconfigvar($cfgprofile, 'ircchansilent'), '#freenode')}, # exact opposite, channels to shut up in
-          oper    => getconfigvarordie($cfgprofile, 'defaultoperator'), # Primary nick for primary bot operator.
-          opers   => [uniq(getconfigvar($cfgprofile, 'defaultoperator'),
-                           getconfigvar($cfgprofile, 'operator')),
+  $ourclan = getconfigvar($cfgprofile, undef, 'clan') || 'demilichens';
+  for my $network (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1)) {
+    %irc = (
+            %irc, # preserve things that aren't specifically loaded, e.g., $irc{$$network{id}}{channel}
+            server  => getconfigvar($cfgprofile, $$network{id}, 'ircserver') || 'irc.freenode.net',
+            port    => getconfigvar($cfgprofile, $$network{id}, 'ircserverport') || 6667,
+            nick    => [ getconfigvar($cfgprofile, $$network{id}, 'ircnick'), $defaultusername ],
+            nsrv    => getconfigvar($cfgprofile, $$network{id}, 'ircnickserv') || 'NickServ',
+            user    => getconfigvar($cfgprofile, $$network{id}, 'ircusername') || $defaultusername,
+            real    => ("" . getconfigvar($cfgprofile, $$network{id}, 'ircrealname') || "anonymous ircbot operator") . ", represented by $devname",
+            pass    => getconfigvar($cfgprofile, $$network{id}, 'ircpassword') || 'm2RTLVG8iwm3onyNzFXSu0kOYFtdlGB5Nct',
+            email   => getconfigvar($cfgprofile, $$network{id}, 'ircemailaddress'),
+            clan    => $ourclan,
+            demi    => [ getclanmemberlist($ourclan) ],
+            chan    => ['#bot-test',
+                        #'#bot-testing',
+                        #'#bottesting',
+                        getconfigvar($cfgprofile, $$network{id}, 'ircchannel'),
+                       ],
+            okdom   => +{ map { $_ => 1 } (getconfigvar($cfgprofile, $$network{id}, 'ircchanokdom'), 'private')}, # channels it's ok to dominate
+            silent  => +{ map { $_ => 1 } (getconfigvar($cfgprofile, $$network{id}, 'ircchansilent'), '#freenode')}, # exact opposite, channels to shut up in
+            oper    => getconfigvarordie($cfgprofile, $$network{id}, 'defaultoperator'), # Primary nick for primary bot operator.
+            opers   => [uniq(getconfigvar($cfgprofile, $$network{id}, 'defaultoperator'),
+                             getconfigvar($cfgprofile, $$network{id}, 'operator')),
                       # All active GROUPed nicks for primary bot operator.
                       # Currently this doesn't do very much, but in a
                       # future version the bot will look for you and
                       # find which nick you are using if you are
                       # online.
                      ],
-          master  => +{ map { $_ => 1 }
-                        (getconfigvar($cfgprofile, 'master')
+            master  => +{ map { $_ => 1 }
+                          (getconfigvar($cfgprofile, $$network{id}, 'master')
                          # Any nick listed as master can issue any
                          # bot command, including privileged ones.
                          # Don't list unregistered nicks as master,
                          # for obvious reasons.  Nicks can be listed
                          # as master without being the operator, and
                          # vice versa.
-                        ),
-                      },
-          maxlines => getconfigvar($cfgprofile, 'maxlines') || 12,
-          pinglims => [getconfigvar($cfgprofile, 'pingtimelimit')],
+                          ),
+                        },
+            maxlines => getconfigvar($cfgprofile, $$network{id}, 'maxlines') || 12,
+            pinglims => [getconfigvar($cfgprofile, $$network{id}, 'pingtimelimit')],
           pingtime => DateTime->now( @tz ),
-          pingbots => [getconfigvar($cfgprofile, 'pingbot')], # Bots that will respond to !ping in a private /msg
-          siblings => [getconfigvar($cfgprofile, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
+            pingbots => [getconfigvar($cfgprofile, $$network{id}, 'pingbot')], # Bots that will respond to !ping in a private /msg
+            siblings => [getconfigvar($cfgprofile, $$network{id}, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
          );
   undef $irc{colorcache}; # This will get loaded when next used.
 }
@@ -115,12 +116,12 @@ sub logit {
   print LOG "$year/$mon/$mday $hour:$min:$sec " . ("   " x ($level - 1)) . $msg . "\n";
   close LOG;
 }
-sub logandprint {
+sub logandprint { # TODO: meh, the log is enough, kill off this function.
   my ($msg, $level) = @_;
   warn "$msg\n";
   logit($msg, $level || 2);
 }
-sub error {
+sub error { # TODO: kill off this function too; we already have logit(), this adds no more value.
   my ($errortype, $message) = @_;
   warn "$errortype error: $message\n";
   logit("ERROR: $errortype: $message");
@@ -143,64 +144,65 @@ sub playerisclanmember {
   return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembersrvacct', 'serveraccount', $username);
 }
 sub nickisclanmember {
-  my ($username) = @_;
-  return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembernick', 'nick', $username);
+  my ($username, $networkid) = @_;
+  return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembernick', nick      => $username,
+                                                                               networkid => $networkid );
 }
 
 sub settimer {
   my $count;
-  $irc{fork} = AnyEvent::ForkManager->new( max_workers => 12 );
-  $irc{fork}->on_start(sub { my ($fork, $pid, @arg) = @_;
+  $irc{__FORK__} = AnyEvent::ForkManager->new( max_workers => 12 );
+  $irc{__FORK__}->on_start(sub { my ($fork, $pid, @arg) = @_;
                              logit("Starting fork $fork, pid $pid, @arg") if $debug{fork};
                        });
-  $irc{fork}->on_finish(sub { my ($fork, $pid, $status, @arg) = @_;
-                              logit("Finished fork $fork, pid $pid, status $status, @arg");
+  $irc{__FORK__}->on_finish(sub { my ($fork, $pid, $status, @arg) = @_;
+                              logit("Finished fork $fork, pid $pid, status $status, @arg") if $debug{fork};
                         });
-  $irc{timer}{ping} = AnyEvent->timer(
+  $irc{__TIMER__}{ping} = AnyEvent->timer(
                                       after    => 5,
                                       interval => 10,
                                       cb       => sub {
                                         checkpingtimes();
                                       });
-  $irc{timer}{biff} = AnyEvent->timer(
+  $irc{__TIMER__}{biff} = AnyEvent->timer(
                                       after    => 60,
                                       interval => 15,
                                       cb       => sub {
                                         processnotification();
-                                        biff($irc{oper}) if not $count++ % 25;
+                                        periodicbiff() if not $count++ % 25;
                                       }
                                      );
-  $irc{timer}{script} = AnyEvent->timer(
+  $irc{__TIMER__}{script} = AnyEvent->timer(
                                         after    => 15,
                                         interval => 5,
                                         cb       => sub {
                                           if (@scriptqueue) {
                                             #my ($fork, @arg) = @_;
                                             my $sqitem = shift @scriptqueue;
-                                            $irc{fork}->start( cb => sub {
+                                            $irc{__FORK__}->start( cb => sub {
                                                                  doscript($sqitem);
                                                                });
                                           }
                                         }
                                        );
-  $irc{timer}{alarms} = AnyEvent->timer(
+  $irc{__TIMER__}{alarms} = AnyEvent->timer(
                                         after    => 5,
-                                        interval => (60 * (getconfigvar($cfgprofile, 'alarmresminutes') || 5)),
+                                        interval => (60 * (getconfigvar($cfgprofile, undef, 'alarmresminutes') || 5)),
                                         cb       => sub { checkalarms(); },
                                        );
-  $irc{timer}{smtp} = AnyEvent->timer(
+  $irc{__TIMER__}{smtp} = AnyEvent->timer(
                                       after    => 60,
                                       interval => 17, # never send more than one message every this many seconds
                                       cb       => sub {
-                                        $irc{fork}->start( cb => sub {
+                                        $irc{__FORK__}->start( cb => sub {
                                                              sendqueuedmail();
                                                            });
                                       },
                                      );
-  $irc{timer}{sibling} = AnyEvent->timer( after    => 60,
-                                          interval => (60 * (getconfigvar($cfgprofile, 'siblingminutes') || 3)),
+  $irc{__TIMER__}{sibling} = AnyEvent->timer( after    => 60,
+                                          interval => (60 * (getconfigvar($cfgprofile, undef, 'siblingminutes') || 3)),
                                           cb       => sub {
-                                            $irc{fork}->start( cb => sub {
+                                            $irc{__FORK__}->start( cb => sub {
                                                                  checksiblings();
                                                                });
                                           },
@@ -210,36 +212,41 @@ sub settimer {
 
 sub checksiblings {
   logit("Checking on siblings") if $debug{siblings};
-  my @sibling = getconfigvar($cfgprofile, 'sibling');
-  return if not @sibling;
-  my $mins   = (getconfigvar($cfgprofile, 'siblingminutes') + 0) || 3;
+  #my @sibling = getconfigvar($cfgprofile, undef 'sibling'); # Wait, no, we need the network ID for each one too.
+  my @sibrec = findrecord("config", cfgprofile => $cfgprofile, enabled => 1, varname => 'sibling');
+  return if not @sibrec;
+  my $mins   = (getconfigvar($cfgprofile, undef, 'siblingminutes') + 0) || 3; # TODO: allow this to be customized per-network
   logit("sibling mins: $mins") if $debug{siblings} > 5;
   my $now    = DateTime->now(@tz);
   my $once   = DateTime::Format::ForDB($now->clone()->subtract( minutes => $mins ));
   my $twice  = DateTime::Format::ForDB($now->clone()->subtract( minutes => (2 * $mins)));
   my $thrice = DateTime::Format::ForDB($now->clone()->subtract( minutes => (3 * $mins)));
-  for my $sib (@sibling) {
+  for my $sibr grep { $$_{value} and $$_{networkid} } (@sibrec) {
+    my $sib = $$sibr{value};
+    my $nid = $$sibr{networkid};
     # TODO: support nick aliases
     logit("Checking on $sib", 3) if $debug{siblings} > 3;
-    my ($seen) = findrecord('seen', 'nick', $sib);
-    if ($$seen{whenseen} lt $thrice) {
-      if (index($$seen{notes}, "Told $irc{oper}") < 0) {
+    my ($seen) = findrecord('seen', 'nick' => $sib, $networkid => $nid );
+    if ((not ref $seen) or ($$seen{whenseen} lt $thrice)) {
+      if ((not ref $seen) or (index($$seen{notes}, "Told $irc{oper}") < 0)) {
         logit("Thrice: haven't seen $sib since $$seen{whenseen} (limit $thrice), pinging operator") if $debug{siblings};
         say("Hey, $irc{oper}, I haven't heard from $sib since $$seen{whenseen}.",
-            channel => 'private', sender => $irc{oper});
+            networkid => $nid, channel => 'private', sender => $irc{oper});
         my $nowhms = $now->hms();
-        $$seen{notes} = join "\n", grep { $_ } ($$seen{notes}, qq[Told $irc{oper} $nowhms]);
-        updaterecord('seen', $seen);
+        if (ref $seen) {
+          $$seen{notes} = join "\n", grep { $_ } ($$seen{notes}, qq[Told $irc{oper} $nowhms]);
+          updaterecord('seen', $seen);
+        }
       } else {
         logit("Thrice Again: haven't seen $sib since $$seen{wheenseen} (limit $thrice) but already told $irc{oper}.")
           if $debug{siblings} > 3;
       }
     } elsif ($$seen{whenseen} lt $twice) {
       logit("Twice: haven't seen $sib since $$seen{whenseen}");
-      say("!ping", channel => 'private', sender => $sib) if $debug{siblings} > 1;
+      say("!ping", networkid => $nid, channel => 'private', sender => $sib) if $debug{siblings} > 1;
     } elsif ($$seen{whenseen} lt $once) {
       logit("Once: pinging $sib") if $debug{siblings} > 2;
-      say("!ping", channel => 'private', sender => $sib);
+      say("!ping", networkid => $nid, channel => 'private', sender => $sib);
     }
   }
 }
@@ -268,10 +275,11 @@ sub sendqueuedmail {
   if (sendmail(%mail)) {
     $$msg{dequeued} = DateTime::Format::ForDB(DateTime->now(@tz));
     say("Email message #" . $$msg{id} . " sent to $$msg{tofield}.",
-        channel => 'private', sender => $$msg{nick});
+        networkid => $$msg{ircnetworkid}, channel => 'private', sender => $$msg{nick});
   } else {
     logit("SMTP error: $Mail::Sendmail::error");
-    say($Mail::Sendmail::error, channel => 'private', sender => $$msg{nick});
+    say($Mail::Sendmail::error,
+        networkid => $$msg{ircnetworkid}, channel => 'private', sender => $$msg{nick});
   }
   updaterecord('mailqueue', $msg);
 }
@@ -283,10 +291,12 @@ sub checkalarms {
   if (@alarm) {
     @alarm = grep { (not $$_{snoozetill}) or ($$_{snoozetill} le $dbnow) } @alarm;
     for my $alarm (@alarm) {
-      my $ftime = friendlytime($now, (getircuserpref($$alarm{nick}, 'timezone')|| $prefdefault{timezone}), 'alarm');
+      my $ftime = friendlytime($now, (getircuserpref($$alarm{networkid}, $$alarm{nick}, 'timezone')
+                                      || $prefdefault{timezone}), 'alarm');
       my $says  = ($$alarm{sender} eq $$alarm{nick}) ? '' : qq[$$alarm{sender} says];
       warn "No nick for alarm $$alarm{id}" if not $$alarm{nick};
-      say("It's ${ftime}: [$$alarm{id}] $says$$alarm{message}", sender => $$alarm{nick}, channel => 'private');
+      say("It's ${ftime}: [$$alarm{id}] $says$$alarm{message}",
+          networkid => $$alarm{networkid}, sender => $$alarm{nick}, channel => 'private');
       # TODO: if the user's not ON at the moment, enqueue a !tell instead
       $$alarm{viewcount}++;
       $$alarm{viewed} = $dbnow;
@@ -294,6 +304,7 @@ sub checkalarms {
       updaterecord('alarm', $alarm);
     }
   }
+  # Now do recurring alarms:
   my $midnight = DateTime->new( year => $now->year, month => $now->month, day => $now->mday() );
   my $tomorrow = $now->clone()->add(days => 1);
   my @ralarm = grep { $$_{lasttripped} lt DateTime::Format::ForDB($midnight) } getrecord('recurringalarm');
@@ -306,11 +317,13 @@ sub checkalarms {
       my $when = DateTime->new( year      => $tomorrow->year(),
                                 month     => $tomorrow->month(),
                                 day       => $tomorrow->mday(),
-                                time_zone => (getircuserpref($$ralarm{nick}, 'timezone') || $prefdefault{timezone} || $servertz),
+                                time_zone => (getircuserpref($$ralarm{networkid}, $$ralarm{nick}, 'timezone')
+                                              || $prefdefault{timezone} || $servertz),
                                 hour      => $$ralarm{hour},
                                 minute    => $$ralarm{minute},
                               )->set_time_zone("UTC");
-      addrecord('alarm', +{ nick      => $$ralarm{nick},
+      addrecord('alarm', +{ networkid => $$ralarm{networkid},
+                            nick      => $$ralarm{nick},
                             sender    => $$ralarm{sender},
                             setdate   => $dbnow,
                             alarmdate => DateTime::Format::ForDB($when),
@@ -331,8 +344,8 @@ sub doscript {
 }
 
 sub updateseen { # Don't call directly; call updatepingtimes() instead.
-  my ($dt, $nick, $channel, $text) = @_;
-  my @s = findrecord('seen', nick => $nick);
+  my ($dt, $netid, $nick, $channel, $text) = @_;
+  my @s = findrecord('seen', networkid => $netid, nick => $nick);
   my $whenseen = DateTime::Format::ForDB($dt);
   if (@s) {
     logit("Too many seen records for $nick") if 1 < scalar @s;
@@ -344,6 +357,7 @@ sub updateseen { # Don't call directly; call updatepingtimes() instead.
     updaterecord('seen', $s);
   } else {
     addrecord('seen', +{ nick     => $nick,
+                         networkid => $netid,
                          whenseen => $whenseen,
                          channel  => $channel,
                          details  => $text,
@@ -352,38 +366,50 @@ sub updateseen { # Don't call directly; call updatepingtimes() instead.
 }
 
 sub updatepingtimes {
-  my ($sender, $channel, $text) = @_;
-  my $oldtime = $irc{pingtime};
-  $irc{pingtime} = DateTime->now(@tz);
-  logit("Updated pingtime from $oldtime to $irc{pingtime}",3) if $debug{pingtime} > 6;
-  updateseen($irc{pingtime}, $sender, $channel, $text);
+  my ($netid, $sender, $channel, $text) = @_;
+  my $oldtime = $irc{$netid}{pingtime};
+  $irc{$netid}{pingtime} = DateTime->now(@tz);
+  logit("Updated pingtime on network $netid from $oldtime to $irc{$netid}{pingtime}",3) if $debug{pingtime} > 6;
+  updateseen($irc{pingtime}, $netid, $sender, $channel, $text);
 }
 sub checkpingtimes {
-  my $now   = DateTime->now(@tz);
-  logit("Checking ping times at " . $now->hms(),3) if $debug{pingtime} > 3;
-  my @bot = @{$irc{pingbots}};
-  if (not scalar @{$irc{pinglims}}) { push @{$irc{pinglims}}, 30;
-                                      push @{$irc{pinglims}}, 45; }
-  if (not scalar @{$irc{pingbots}}) { push @{$irc{pingbots}}, 'Arsinoe'; }
-  for my $lim (@{$irc{pinglims}}) {
+ my $now   = DateTime->now(@tz);
+ logit("Checking ping times at " . $now->hms(),3) if $debug{pingtime} > 3;
+ for my $network (findrecord('ircnetwork', cfgprofile => $cfgprofile, enabled => 1)) {
+   logit("Checking ping times for network $$network{id}, $$network{networkname}") if $debug{pingtime} > 4;
+   my @bot = @{$irc{$$network{id}}{pingbots}};
+   if (not scalar @{$irc{$$network{id}}{pinglims}}) { push @{$irc{$$network{id}}{pinglims}}, 30;
+                                                      push @{$irc{$$network{id}}{pinglims}}, 45; }
+  if (not scalar @{$irc{$$network{id}}{pingbots}}) {
+    if ($$network{networkname} eq 'freenode') {
+      push @{$irc{$$network{id}}{pingbots}}, 'Arsinoe';
+    } else {
+      logit("WARNING: no pingbots configured for network $$networkid{id}; the operator will get pinged a lot.");
+    }
+    push @{$irc{$$network{id}}{pingbots}}, $irc{$$network{id}}{oper};
+  }
+  for my $lim (@{$irc{$$network{id}}{pinglims}}) {
     my $bot = shift @bot;
     logit("lim $lim, bot $bot", 3) if $debug{pingtime} > 4;
-    my $pt  = $irc{pingtime} || $now;
+    my $pt  = $irc{$$network{id}}{pingtime} || $now;
     my $limit = $pt->clone()->add( seconds => $lim );
     logit("now $now, limit $limit", 4) if $debug{pingtime} > 5;
     return if $limit > $now;
     logit("Past ping limit ($lim seconds), pinging $bot");
-    say("!ping", channel => 'private', sender => $bot);
+    say("!ping", networkid => $$network{id}, channel => 'private', sender => $bot);
     push @bot, $bot;
   }
-  logit("Past all ping limits.  Restarting...");
+   # TODO: Rather than restarting everything, try just disconnecting/reconnecting the problem network.
+  logit("Past all ping limits for network $$network{id} ($$network{networkname}).  Restarting...");
   #exec "jonadabot.pl"; # exec doesn't work from inside an AnyEvent callback, a limitation of the framework.
   #logit("exec returned (checkpingtimes)", 1);
+   # TODO: If we DO need to restart, try to do it more elegantly, reaping all the condvars.
   system("kill", $$);
   sleep 3;
   system("kill", "-9", $$);
   sleep 3;
-  logit("I am immortal, but I am all alone.", 1);
+  logit("I am immortal, but I am all alone ($$).", 1);
+ }
 }
 
 sub greeting { # punctuation may be added automatically, so don't include it
@@ -404,6 +430,8 @@ sub greeting { # punctuation may be added automatically, so don't include it
            # And finally...
            "Hello, will you please leave your ki-rin outside",
           );
+  # TODO: allow these greetings to be customized in the database;
+  #       leave the ones above as a default if none are configured.
   return $g[int rand rand int rand @g];
 }
 sub addnicktochannel {
@@ -445,11 +473,15 @@ sub parseprefix { # This function needs work.  I'm still finding cases it
 
 sub say {
   my ($message, %arg) = @_;
-  print $message . "\n" if $debug{say};
+  if (not $arg{networkid}) {
+    logit("ERROR: say called without networkid: say(@_)");
+    return;
+  }
+  my $irc = $irc{$arg{networkid}}{client};
   my $target = ($arg{channel} eq 'private') ? $arg{sender} : $arg{channel};
-  logit("say [to $target]: $message") if $debug{say} > 1;
+  logit("say [to $target on network $arg{networkid}]: $message") if $debug{say} > 1;
   if (($arg{channel} eq 'private') and ($arg{sender})) {
-    $message =~ s~^/me ~$irc{nick}[0] ~;
+    $message =~ s~^/me ~$irc{$arg{networkid}}{nick}[0] ~;
     #if ($message =~ m!^/me !) { # TODO: this doesn't work right; see if it can be made to work better.
     #  $message =~ s!^/me (.*)!ACTION $1!;
     #}
@@ -457,12 +489,12 @@ sub say {
   } elsif ($arg{force}) {
     $irc->send_srv(PRIVMSG => $arg{channel}, $message);
   } elsif ((grep { $_ eq $arg{channel}
-                 } getconfigvar($cfgprofile, 'ircchanokdom'),
-                   getconfigvar($cfgprofile, 'ircchannel'))
-           and not (grep { $_ eq $arg{channel} } getconfigvar($cfgprofile, 'ircchansilent'))
+                 } getconfigvar($cfgprofile, $arg{networkid}, 'ircchanokdom'),
+                   getconfigvar($cfgprofile, $arg{networkid}, 'ircchannel'))
+           and not (grep { $_ eq $arg{channel} } getconfigvar($cfgprofile, $arg{networkid}, 'ircchansilent'))
           ) {
-    my @myrecent = grep { /^Arsinoe/ } @{$irc{channel}{lc $arg{channel}}{recentactivity}};
-    if ((5 >= @myrecent) or (grep { $_ eq $arg{channel} } getconfigvar($cfgprofile, 'ircchanokdom'))) {
+    my @myrecent = grep { /^Arsinoe/ } @{$irc{$arg{networkid}}{channel}{lc $arg{channel}}{recentactivity}};
+    if ((5 >= @myrecent) or (grep { $_ eq $arg{channel} } getconfigvar($cfgprofile, $arg{networkid}, 'ircchanokdom'))) {
       #$message =~ s~^/me ~$irc{nick}[0] ~;
       if ($message =~ m!^/me !) {
         $message =~ s!^/me (.*)!ACTION $1!;
@@ -495,38 +527,45 @@ sub say {
 
 sub getircuserpref {
   # TODO: support nick aliases with an elsif to the canonical one's pref
-  my ($user, $var) = @_;
-  if ($user) {
-    my $r = findrecord('userpref', 'username', $user, 'prefname', $var);
+  my ($nid, $user, $var) = @_;
+  if ($nid and $user) {
+    my $r = findrecord('userpref', networkid => $nid, username => $user, prefname => $var);
     if (ref $r) {
       return $$r{value};
     } else {
       logit("Did not find preference $var for $user, using default, $prefdefault{$value}");
       return $prefdefault{$value};
     }
+  } elsif (not $nid) {
+    carp("IRC user prefs are network-specific");
   } else {
     carp("Can't get irc user pref without a nick");
   }
 }
 
 sub setircuserpref {
-  my ($user, $var, $value, %arg) = @_;
-  my (@r) = findrecord('userpref', 'username', $user, 'prefname', $var);
+  my ($nid, $user, $var, $value, %arg) = @_;
+  my (@r) = findrecord('userpref', networkid => $nid,
+                                   username  => $user,
+                                   prefname  => $var );
   if (@r) {
     my $r = $r[0];
-    logit("Too many values of pref $var for user $user") if 1 < scalar @r;
+    logit("Multiple values of pref $var for user $user on network $nid") if 1 < scalar @r;
     $$r{value} = $value;
     updaterecord('userpref', $r);
     logit("Changing userpref $var to $value for $user") if $debug{preference} > 1;
   } else {
-    addrecord('userpref', +{ username => $user, prefname => $var, value => $value });
-    logit("Creating $var preference for $user") if $debug{preference};
+    addrecord('userpref', +{ networkid => $nid, username => $user,
+                             prefname  => $var, value    => $value });
+    logit("Creating $var preference for $user on network $nid") if $debug{preference};
   }
-  my $newval = getircuserpref($user, $var);
+  my $newval = getircuserpref($nid, $user, $var);
   if ($newval eq $value) {
-    say("New value for $var set.", sender => $user, fallbackto => 'private', %arg);
+    say("New value for $var set.",
+        networkid => $nid, sender => $user, fallbackto => 'private', %arg);
   } else {
-    say("Something went wrong setting that variable.", sender => $user, fallbackto => 'private');
+    say("Something went wrong setting that variable.",
+        networkid => $nid, sender => $user, fallbackto => 'private', %arg);
   }
 }
 
@@ -547,6 +586,8 @@ sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, on
                # Bot operators and masters are expected to have a copy of the source.
   # Additionally, helpinfo() is now deprecated in favor of the helpurl config variable.
   # To that end, a sample bot-help.html file is included with the distribution.
+  # TODO: However, this should probably still be fixed up a bit, e.g., the tourney
+  #       clan-related stuff should only be shown if a clan is configured.
   my ($item) = @_;
   if ($item eq '') {
     return "For more info: !help topic, where topic is alarm, deaths, gt, member, message, rng, seen, tea, tell, time, trophies";
@@ -584,22 +625,36 @@ sub debuginfo {
     loaddebuglevels();
     say("Debug levels reloaded.");
   } elsif ($item eq 'channels') {
-    my @ch = keys %{$irc{channel}};
-    logit("!DEBUG channels: " . join ", ", @ch);
-    return "I have written a list to my log file.";
-  } elsif ($item =~ /^channicks=/) {
-    my ($ch) = $item =~ /^channicks=(\S+)/;
-    my $nicks = join ", ", @{$irc{channel}{lc $ch}{nicks}};
-    logit("!DEBUG channicks=$ch: $nicks");
-    return "I have written a list to my log file.";
-  } elsif ($item eq 'recent') {
-    my ($channel) = @arg;
-    my $count = 0;
-    for my $r (@{$irc{channel}{lc $channel}{recentactivity}}) {
-      ++$count;
-      say("$count: $r", channel => 'private', sender => $irc{oper});
+    for my $network (findrecord('ircnetwork', cfgprofile => $cfgprofile, enabled => 1)) {
+      my @ch = keys %{$irc{$$network{id}}{channel}};
+      logit("!DEBUG channels for network $$network{id}: " . join ", ", @ch);
     }
-    return "Sent $count lines of recent activity to $irc{oper}";
+    return "Check my log file.";
+  } elsif ($item =~ /^channicks=/) {
+    for my $network (findrecord('ircnetwork', cfgprofile => $cfgprofile, enabled => 1)) {
+      my ($ch) = $item =~ /^channicks=(\S+)/;
+      if (ref $irc{$$network{id}}{channel}) {
+        my $nicks = join ", ", @{$irc{$$network{id}}{channel}{lc $ch}{nicks}};
+        logit("!DEBUG channicks=$ch: $nicks (netid: $$network{id})");
+      }}
+    return "Check my log file.";
+  } elsif ($item eq 'recent') {
+    my $network;
+    my ($netid, $channel) = split /\s+/, $arg[0];
+    if ($netid =~ /^\d+$/) {
+      $network = getrecord("ircnetwork", $netid);
+    } else {
+      $network = findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1,
+                                          networkname => $netid);
+    }
+    return "Did not find network record $netid" if not ref $network;
+    my $count = 0;
+    for my $r (@{$irc{$$network{id}}{channel}{lc $channel}{recentactivity}}) {
+      ++$count;
+      say("$count: $r",
+          networkid => $$network{id}, channel => 'private', sender => $irc{$$network{id}}{oper});
+    }
+    return "Sent $count lines of recent activity to $irc{$$network{id}}{oper}";
   } elsif ($item eq 'list') {
     return join "; ", map { qq[$_ => $debug{$_}] } sort { $a cmp $b } keys %debug;
   } elsif ($item =~ /set (\w+) (\d+)/) {
@@ -624,16 +679,19 @@ sub debuginfo {
 sub handlectcp {
   my ($client, $netid, $sender, $target, $tag, $msg, $type, $netid) = @_;
   my $respond = 0;
-  logit("handlectcp(self, $sender, $target, $tag, $msg, $type)") if $debug{ctcp};
-  updatepingtimes($sender, 'ctcp', $tag);
+  logit("handlectcp(self, $netid, $sender, $target, $tag, $msg, $type)") if $debug{ctcp};
+  updatepingtimes($netid, $sender, 'ctcp', $tag);
   if ($type eq 'NOTICE') { # The CTCP message was in a channel.  Only respond if sender is a master.
-    $respond = ($irc{master}{$target}) ? 1 : 0;
+    $respond = ($irc{$netid}{master}{$target}) ? 1 : 0;
+    # TODO: I have become uncertain about whether my original interpretation was correct.
+    #       Does NOTICE mean that it was in a channel, or that it's a response already?
+    #       This needs to be investigated (tested, if possible).
   } elsif ($type eq 'PRIVMSG') { # The CTCP message was private.  Respond privately (if it's a tag we respond to).
     $respond = 1;
   }
   $respond++ if $irc{master}{$target}; # If the sender is our master, we may respond to some tags we otherwise would not.
   my $response = undef;
-  logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg") if $debug{ctcp};
+  logit("CTCP tag $tag, type $type, target $target, respond $respond, msg $msg, netid $netid") if $debug{ctcp};
   if ($tag eq 'VERSION') {
     my $perlver  = ($] ge '5.006') ? (sprintf "%vd", $^V) : $];
     $response = qq[$devname $version $devstatus / Perl $perlver / See $gitpage];
@@ -641,91 +699,62 @@ sub handlectcp {
   } elsif ($tag eq 'TIME') {
     my $dt       = DateTime->now(@tz);
     $response = $dt->year() . ' ' . $dt->month_abbr() . ' ' . $dt->mday() . ' at ' . ampmtime($dt) . ' ' . friendlytz($dt);
+    logit("Formulated CTCP TIME response: $response") if $debug{ctcp};
   } elsif ($tag eq 'PING') {
     if ($msg =~ /([0-9 ]+)/) {
       $response = $1;
+      logit("Formulated CTCP PING response: $response") if $debug{ctcp};
     }
   } elsif ($tag eq 'ACTION') {
-    my $bslimit = 0 + max(getconfigvar($cfgprofile, "backscroll$target"));
-    if ($bslimit > 0) {
-      # TODO: save backscroll if appropriate.
-      logit("Saving ACTION backscroll for channel $howtorespond") if $debug{backscroll} > 5;
-      my $ptr = findrecord('config', cfgprofile => $cfgprofile, varname => "bsi_$target", enabled => 1 )
-        || +{ cfgprofile => $cfgprofile, varname => "bsi_$target", enabled => 1, value => -1 };
-      $$ptr{value} = (($$ptr{value} + 1) % $bslimit);
-      my $bsr = findrecord("backscroll", channel => $target, number => $$ptr{value})
-        || +{ channel => $target, number => $$ptr{value} };
-      $$bsr{whensaid} = DateTime::Format::ForDB(DateTime->now(time_zone => 'UTC'));
-      $$bsr{speaker}  = $sender;
-      $$bsr{message}  = $msg;
-      $$bsr{flags}    = 'A'; # ACTION
-      if ($$bsr{id}) {
-        updaterecord("backscroll", $bsr);
-      } else {
-        addrecord("backscroll", $bsr);
-      }
-      if ($$ptr{id}) {
-        updaterecord("config", $ptr);
-      } else {
-        addrecord("config", $ptr);
-      }
-    }
+    savebackscroll($netid, $target, $sender, $msg, 'A'); # The A flag means ACTION.
     # If it's an okdom channel, maybe respond if we are mentioned by name:
-    if (index((lc $msg), (lc $irc{nick})) >= 0) {
-      my $respondchance = getconfigvar($cfgprofile, 'respondwhennamed') || 0;
+    if (index((lc $msg), (lc $irc{$netid}{nick})) >= 0) {
+      my $respondchance = getconfigvar($cfgprofile, $netid, 'respondwhennamed') || 0;
       # To avoid infinite loops if somebody puts a second instance of
       # the bot in the same channel, the chance can never be 100 percent:
       $respondchance = 80 if $respondchance >= 95;
       if (($respondchance <= rand(100)) and
-          (grep { $_ eq $target } getconfigvar($cfgprofile, 'ircchanokdom'))) {
+          (grep { $_ eq $target } getconfigvar($cfgprofile, $netid, 'ircchanokdom'))) {
         if (ref $routine{respondwhennamed}) {
-          $routine{respondwhennamed}->($target, $sender, $msg, 'ACTION');
+          $routine{respondwhennamed}->($target, $netid, $sender, $msg, 'ACTION');
         } else { # default:
           my @adv = ("", "casually ", "brazenly ", "openly ", "quickly ", "dismissively ", "");
           my @verb = ("mentions", "refers to", "ridicules", "answers", "hugs", "holds hands with", "slaps", "smites", "kisses");
           my $adv = $adv[int rand rand @adv];
           my $verb = $verb[int rand rand @verb];
-          say("/me $adv$verb $sender", channel => $target, sender => $sender, fallbackto => 'private');
+          say("/me $adv$verb $sender",
+              networkid => $netid, channel => $target, sender => $sender, fallbackto => 'private');
         }
       }
     }
   } # TODO: DCC support might be a useful way to deliver things like backscroll.
   logit("handlectcp: respond $respond, response $response", 3) if $debug{ctcp};
   if ($respond and $response) {
-    $irc->send_srv(NOTICE => $sender, qq[$tag $response]);
+    $irc{$netid}{client}->send_srv(NOTICE => $sender, qq[$tag $response]);
   }
 }
 
-sub handlemessage {
-  my ($client, $netid, $prefix, $text, $howtorespond) = @_;
-  # howtorespond should either be 'private' or a channel
-  # The prefix is raw, as received by the callback.
-  my $sender = parseprefix($prefix, qq[handlemessage('$prefix', '$text', '$howtorespond')]) || '__NO_SENDER__';
-  warn("handlemessage: no sender") and return if not $sender;
-  logit("parseprefix DRIBBLE: $prefix") if not $sender;
-  my $fallbacktoprivate = 0;
-  my $now = DateTime->now( @tz );
-  # $irc{channel}{lc $howtorespond}{seen}{lc $sender} = $now; # Note that 'private' is treated as a channel.
-  # ^ That's obsolete now that we are storing seen data in the DB.
-  #   Now updateseen() is called by updatepingtimes(), below.
-  #warn "[push irc{channel}{$howtorespond}, $sender]\n";
-  $irc{channel} ||= +{};
-  $irc{channel}{lc $howtorespond} ||= +{};
-  logit("Adding $sender to recent activity list for channel $howtorespond") if $debug{recentactivity};
-  push @{$irc{channel}{lc $howtorespond}{recentactivity}}, $sender;
-  my $bslimit = 0 + max(getconfigvar($cfgprofile, "backscroll$howtorespond"));
-  logit("backscroll limit for $howtorespond: $bslimit") if $debug{backscroll} > 6;
+sub savebackscroll {
+  my ($nid, $channel, $sender, $text, $flags) = @_;
+  my $bslimit = 0 + max(getconfigvar($cfgprofile, $netid, "backscroll$channel"));
+  logit("backscroll limit for ($netid) $channel: $bslimit") if $debug{backscroll} > 6;
   if ($bslimit > 0) {
-    logit("Saving backscroll for channel $howtorespond") if $debug{backscroll} > 5;
-    my $ptr = findrecord('config', cfgprofile => $cfgprofile, varname => "bsi_$howtorespond", enabled => 1 )
-      || +{ cfgprofile => $cfgprofile, varname => "bsi_$howtorespond", enabled => 1, value => -1 };
+    logit("Saving backscroll for channel $channel") if $debug{backscroll} > 5;
+    my $ptr = findrecord('config', cfgprofile => $cfgprofile,
+                                   networkid  => $netid,
+                                   varname    => "bsi_$channel",
+                                   enabled    => 1 )
+      || +{ cfgprofile => $cfgprofile,    networkid => $netid,
+            varname    => "bsi_$channel", enabled   => 1,      value => -1 };
     $$ptr{value} = (($$ptr{value} + 1) % $bslimit);
-    my $bsr = findrecord("backscroll", channel => $howtorespond, number => $$ptr{value})
-      || +{ channel => $howtorespond, number => $$ptr{value} };
+    my $bsr = findrecord("backscroll", networkid => $netid,
+                                       channel   => $channel,
+                                       number    => $$ptr{value})
+      || +{ networkid => $netid, channel => $channel, number => $$ptr{value} };
     $$bsr{whensaid} = DateTime::Format::ForDB(DateTime->now(time_zone => 'UTC'));
     $$bsr{speaker}  = $sender;
     $$bsr{message}  = $text;
-    $$bsr{flags}    = '';
+    $$bsr{flags}    = $flags;
     if ($$bsr{id}) {
       updaterecord("backscroll", $bsr);
     } else {
@@ -737,47 +766,48 @@ sub handlemessage {
       addrecord("config", $ptr);
     }
   }
+}
 
-  while (20 < scalar @{$irc{channel}{lc $howtorespond}{recentactivity}}) { # Not-so-recent
-     shift @{$irc{channel}{lc $howtorespond}{recentactivity}}
+sub handlemessage {
+  my ($client, $netid, $prefix, $text, $howtorespond) = @_;
+  # howtorespond should either be 'private' or a channel
+  # The prefix is raw, as received by the callback.
+  my $sender = parseprefix($prefix, qq[handlemessage($netid, '$prefix', '$text', '$howtorespond')]) || '__NO_SENDER__';
+  if (not $sender) {
+    warn("handlemessage: no sender");
+    logit("parseprefix DRIBBLE: $prefix");
+    return;
   }
-  my $oldpingtime = $irc{pingtime};
-  updatepingtimes($sender, $howtorespond, $text);
+  my $fallbacktoprivate = 0;
+  my $now = DateTime->now( @tz );
+  $irc{$netid}{channel} ||= +{};
+  $irc{$netid}{channel}{lc $howtorespond} ||= +{};
+  logit("Adding $sender to recent activity list for channel $howtorespond on network $netid") if $debug{recentactivity};
+  push @{$irc{$netid}{channel}{lc $howtorespond}{recentactivity}}, $sender;
+  savebackscroll($netid, $howtorespond, $sender, $text, '');
+  while (20 < scalar @{$irc{$netid}{channel}{lc $howtorespond}{recentactivity}}) {
+     shift @{$irc{$netid}{channel}{lc $howtorespond}{recentactivity}}; # Remove not-so-recent ones.
+  }
+  my $oldpingtime = $irc{$netid}{pingtime};
+  updatepingtimes($netid, $sender, $howtorespond, $text);
   my (@rec); # assigned in one of the conditionals below.
   if ($text =~ /^!tea\s*(black|green|herbal|white|oolang)*\s*(\w*)/) {
     my ($type, $namedrecipient) = ($1, $2);
-    my $recipient = $sender; # Back to the user by default.
-    if ($irc{master}{$namedrecipient}) {
-      $recipient = $namedrecipient;
-    } elsif (($namedrecipient =~ /^(Ars[ie]no|jonadabot)/) or (grep { $_ eq $namedrecipient } @{$irc{nick}})) {
-      $recipient = undef;
-    } elsif ($namedrecipient and haveseenlately($namedrecipient)) {
-      $recipient = $namedrecipient;
-    }
-    if (rand(100) > 98) { $recipient = $sender; }
-    tea( recipient => $recipient, channel => $howtorespond,
+    my $recipient = vettenamedrecipient($namedrecipient, $netid, $sender, 'tea');
+    tea( recipient => $recipient, networkid => $netid, channel => $howtorespond,
          sender => $sender, bev => ($type ? qq[$type tea] : undef),
          fallbackto => 'private', );
   } elsif ($text =~ /^!juice\s*(.*)/) {
-    my ($namedrecipient) = $1;
-    my $recipient = $sender; # Back to the user by default.
-    if (($namedrecipient eq 'Rodney') or ($irc{master}{$namedrecipient})) {
-      $recipient = $namedrecipient;
-    } elsif ($namedrecipient =~ /^Ars[ie]noe/) {
-      $recipient = undef;
-    } elsif ($namedrecipient and haveseenlately($namedrecipient)) {
-      $recipient = $namedrecipient;
-    }
-    if (rand(100) > 98) { $recipient = $sender; }
-    juice(recipient => $recipient, channel    => $howtorespond,
+    my $recipient = vettenamedrecipient($1, $netid, $sender, 'juice');
+    juice(recipient => $recipient, networkid  => $netid, channel    => $howtorespond,
           sender    => $sender,    fallbackto => 'private');
   } elsif ($text =~ /^!(coffee|beer|wine|booze|sake)\s*(.*)/) {
-    my ($bev, $recipient) = ($1, $2);
-    $recipient ||= $sender;
+    my ($bev, $namedrecipient) = ($1, $2);
+    $recipient  = vettenamedrecipient($namedrecipient, $netid, $sender, "bev:$bev");
     my $pronoun = (getconfigvar($cfgprofile, 'botismale') ? "his" : "her");
     # Why is jonadabot styled female by default?  Because during early development it used the nick "Arsinoe".
-    say("/me holds $pronoun nose and throws a mug of cold black coffee at $recipient",
-        channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+    say("/me holds $pronoun nose and throws a mug of cold black coffee at $recipient.",
+        networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!deaths?\s*(.*)/) { # TODO: generalize this by allowing commands/scripts to be listed in the DB.
     my @extraarg = grep { /^(reparse|partial|url|clan=\w+)$/ } split /\s+/, $1;
     my $sayresults = sub {
@@ -788,10 +818,10 @@ sub handlemessage {
         $page = "deaths-$oclan.html";
       }
       say("http://74.135.83.0:8018/nethack-stuff/$page",
-          channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       if ($page eq 'deaths-needed.html') {
         say("http://74.135.83.0:8018/nethack-stuff/deaths-obtained.html",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }
     };
     if (grep {/url/} @extraarg) {
@@ -803,7 +833,7 @@ sub handlemessage {
     my @extraarg = grep { /^(reparse|partial|url)$/ } split /\s+/, $1;
     my $sayresults = sub {
       say("http://74.135.83.0:8018/nethack-stuff/trophies-needed.html",
-          channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     };
     if (grep { /url/ } @extraarg) {
       $sayresults->(@extraarg);
@@ -812,17 +842,18 @@ sub handlemessage {
     }
   } elsif ($text =~ /^!ping\s*?( ?\w{0,20})/) {
     my ($userdata) = ($1);
-    my ($extradata) = ($irc{master}{$sender} ? (qq[ $$ pt=] . $irc{pingtime}->hms()) : '');
-    say("!pong$extradata $userdata", channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+    my ($extradata) = ($irc{$netid}{master}{$sender} ? (qq[ $$ pt=] . $irc{$netid}{pingtime}->hms()) : '');
+    say("!pong$extradata $userdata",
+        networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!members?\s*(\w*)\s*(\w*)/) {
     my ($subcommand, $target) = ($1, $2);
     $subcommand ||= 'list';
-    if ($irc{okdom}{$howtorespond}) {
+    if ($irc{$netid}{okdom}{$howtorespond}) {
       if ($subcommand eq 'list') {
         my $list = join "; ", map {
           my $midr = $_;
           my @nick = map { $$_{nick} } sort { $$a{prio} <=> $$b{prio}
-                                            } findrecord('clanmembernick', 'memberid', $$midr{id});
+                                            } findrecord('clanmembernick', memberid => $$midr{id}, ircnetworkid => $netid);
           my @srva = map { $$_{serveraccount} } findrecord('clanmembersrvacct', 'memberid', $$midr{id});
           my @alias = grep { $_ ne $$midr{tourneyaccount} } uniq(@nick, @srva);
           $$midr{tourneyaccount} . ((scalar @alias) ? (qq[ (aka: ] . (join ", ", @alias) . qq[)]) : '');
@@ -830,31 +861,31 @@ sub handlemessage {
         say(qq[$ourclan members: $list], channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } elsif ($subcommand eq 'alias') {
         say("Adding IRC nick aliases for clan members is a planned feature.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } elsif ($subcommand eq 'scrape') { # TODO
         say("Scraping the tournament site for new clan members and server accounts is a planned feature.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } elsif ($subcommand eq 'add') { # TODO
         say("Adding members to the clan is a planned feature.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } elsif ($subcommand eq 'subtract') { # TODO
         say("Removing members from the clan is a planned feature.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }}
   } elsif ($text =~ /^!gt\s*(.*)/) {
     my ($member) = ($1);
-    if (nickisclanmember($member) or playerisclanmember($member)) {
+    if (nickisclanmember($member, $netid) or playerisclanmember($member)) {
       my $whoever = join " ", map { ucfirst lc $_ } split /\s+/, $member;
       say("Go $whoever!  " . ganbatte($whoever, "!gt"),
-          channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     } else {
       my $teamname = ucfirst $ourclan;
       say("Go Team $teamname!",
-          channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
   } elsif ($text =~ /^!(rng|role|race)\s*(.*)/) { # TODO: handle this out of the generalized triggers interface
     my ($command, $stuff) = ($1, $2);
-    if ($irc{okdom}{$howtorespond}) {
+    if ($irc{$netid}{okdom}{$howtorespond}) {
       my @item;
       my %special = (
                      role => [qw(Val Val Val Val Val Val Val
@@ -884,12 +915,13 @@ sub handlemessage {
       }
       my $item = $item[rand @item];
       say($item,
-          channel => $howtorespond, sender => $sender, fallbackto => 'private');
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
   } elsif ($text =~ /^!show(?:pref)?\s*(\w*)/) {
+    # TODO: XXX YOU ARE HERE, doing mulitnetwork infrastructure work, adding in $netid to a lot of function calls.
     my ($var) = ($1);
     if ($var) {
-      my $value = getircuserpref($sender, $var);
+      my $value = getircuserpref($netid, $sender, $var);
       say("$var == $value", channel => 'private', sender => $sender);
     } else {
       my @possible = uniq('timezone', getconfigvar($cfgprofile, 'userpref'));
@@ -905,15 +937,15 @@ sub handlemessage {
       logit("potential timezone value: $tz") if $debug{preference} > 1;
       my ($tzname) = grep { $_ eq $tz } DateTime::TimeZone->all_names();
       $tzname ||= $prefdefault{timezone};
-      setircuserpref($sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
+      setircuserpref(__NETWORK_ID__, $sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
     } elsif ($var eq '') {# TODO: report all set prefs, not just timezone
-      my $tz = getircuserpref($sender, 'timezone');
+      my $tz = getircuserpref($netid, $sender, 'timezone');
       say('timezone: $tz',
           channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
     } else {
       my @possiblepref = getconfigvar($cfgprofile, 'userpref');
       if (grep { $_ eq $var } @possiblepref) {
-        setircuserpref($sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
+        setircuserpref(__NETWORK_ID__, $sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
       }
     }
   } elsif ($text =~ /^!message (\d+)/) {
@@ -955,7 +987,7 @@ sub handlemessage {
       my $s = $s[0];
       $answer = "/me last saw $$s{nick} in $$s{channel} "
         . friendlytime(DateTime::Format::MySQL->parse_datetime($$s{whenseen}),
-                       getircuserpref($sender, 'timezone')) . ".";
+                       getircuserpref($netid, $sender, 'timezone')) . ".";
     }
     if (($howtorespond eq 'private') or ($irc{okdom}{$howtorespond})) {
       say($answer, channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
@@ -964,7 +996,7 @@ sub handlemessage {
       say($answer, channel => 'private', sender => $sender, fallbackto => 'private' );
     }
   } elsif ($text =~ /^!(time|date)/) {
-    my $date = friendlytime(DateTime->now(@tz), getircuserpref($sender, 'timezone'), 'announce');
+    my $date = friendlytime(DateTime->now(@tz), getircuserpref($netid, $sender, 'timezone'), 'announce');
     say ($date, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!(?:rot13|ebg13)/i) {
     my ($blah) = $text =~ /^!rot13\s*(.*)/i;
@@ -985,7 +1017,7 @@ sub handlemessage {
           logit("timepart: $timepart", 3);
           logit("message:  $message",  3);
         }
-        my $tz = (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz);
+        my $tz = (getircuserpref($netid, $sender, 'timezone') || $prefdefault{timezone} || $servertz);
         logit("timezone: $tz") if ($debug{timezone} + $debug{alarm} > 4);
         my $thedate = DateTime->now( time_zone => $tz);
         logit("default date: " . $thedate->ymd(), 2) if $debug{alarm} > 6;
@@ -1048,7 +1080,8 @@ sub handlemessage {
       } else {
         my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
         logit("alarm dt: " . $alarmdt->hms()) if $debug{alarm};
-        my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz));
+        my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
+                                              || $prefdefault{timezone} || $servertz));
         say("Alarm $$alarm{id} viewed " . ($$alarm{viewcount} || 0) . " time(s), "
             . ($$alarm{status} ? 'inactive' : "set to go off $forwhen") . ".",
             channel => 'private', sender => $sender);
@@ -1075,7 +1108,8 @@ sub handlemessage {
       } elsif ((getconfigvar($cfgprofile, 'maxlines') || 12) >= scalar @alarm) {
         for my $alarm (@alarm) {
           my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
-          my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz));
+          my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
+                                                || $prefdefault{timezone} || $servertz));
           say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
         }
       } else {
@@ -1332,7 +1366,7 @@ sub handlemessage {
       logit("Configuration allows up to $limit lines of backscroll for $thechan", 3) if $debug{backscroll};
       # TODO: if linecount is not specified, try to figure out what $sender missed.
       $linecount ||= $limit;
-      $delivery  ||= getircuserpref($sender, "backscrolldelivery") || $prefdefault{backscrolldelivery} || '';
+      $delivery  ||= getircuserpref($netid, $sender, "backscrolldelivery") || $prefdefault{backscrolldelivery} || '';
       logit("Want to do delivery via $delivery if possible", 3) if $debug{backscroll} > 2;
       my $dirpath    = getconfigvar($cfgprofile, "pubdirpath");
       my $diruri     = getconfigvar($cfgprofile, "pubdiruri");
@@ -1354,7 +1388,7 @@ sub handlemessage {
       }
       logit("Linecount limited to $linecount lines", 3) if $debug{backscroll} > 2;
       my $ptr       = findrecord("config", cfgprofile => $cfgprofile, varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
-      my $displaytz = getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz;
+      my $displaytz = getircuserpref($netid, $sender, 'timezone') || $prefdefault{timezone} || $servertz;
       my @line;
       for my $num (1 .. $linecount) {
         my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
@@ -1575,6 +1609,20 @@ sub handlemessage {
   }
 }
 
+sub vettenamedrecipient {
+  my ($namedrecipient, $netid, $sender, $context) = @_;
+  my $recipient = $sender;  # Rebound by default.
+  if ($irc{$netid}{master}{$namedrecipient} or ($irc{$netid}{oper} eq $namedrecipient)) {
+    $recipient = $namedrecipient;
+  } elsif (($namedrecipient =~ /^Ars[ie]noe|jonadabot/) or (grep { $_ eq $namedrecipient } @{$irc{$netid}{nick}})) {
+    $recipient = undef;
+  } elsif ($namedrecipient and haveseenlately($netid, $namedrecipient)) {
+    $recipient = $namedrecipient;
+  }
+  if (rand(100) > (getconfigvar($cfgprofile, $netid, "reboundchance") || 95)) { $recipient = $sender; }
+  return $recipient;
+}
+
 sub ircnickcolor {
   my ($speaker, $context, $audience) = @_;
   my @defaultcolor = ( '#FFFFFF', # White
@@ -1617,13 +1665,15 @@ sub ircnickcolor {
 }
 
 sub haveseenlately {
-  my ($nick) = @_;
+  my ($netid, $nick) = @_;
   # Check to see if we've seen that user "lately".
   my ($latelynum, $latelyunit) = (("" . getconfigvar($cfgprofile, 'lately')) || "72 hours")
     =~ /([0-9.]+)\s*(second|minute|hour|day|week|month|year)/; # We stop short of the "s" here, add it below, so it's optional.
   $latelyunit ||= 'minute';
   my $lately = DateTime::Format::ForDB(DateTime->now(@tz)->add( ($latelyunit . "s") => $latelynum ));
-  my @seen = sort { $$b{whenseen} cmp $$a{whenseen} } grep { $$_{whenseen} ge $lately } findrecord('seen', nick => $namedrecipient);
+  my @seen = sort { $$b{whenseen} cmp $$a{whenseen}
+                  } grep { $$_{whenseen} ge $lately
+                         } findrecord('seen', networkid => $netid, nick => $namedrecipient);
   return if not scalar @seen;
   return $seen[0];
 }
@@ -1633,7 +1683,7 @@ sub viewmessage {
   my $r = getrecord('memorandum', $arg{number});
   if ($$r{target} eq $arg{sender}) {
     my $dt = DateTime::Format::FromDB($$r{thedate});
-    my $date = friendlytime($dt, getircuserpref($$r{target}, 'timezone') || $prefdefault{timezone} || $servertz);
+    my $date = friendlytime($dt, getircuserpref($$r{networkid}, $$r{target}, 'timezone') || $prefdefault{timezone} || $servertz);
     say(qq[$sender: $$r{sender} says, $$r{message} (in $$r{channel}, $date)], %arg);
     $$r{status} = 2;
     $$r{statusdate} = DateTime::Format::ForDB(DateTime->now(@tz));
@@ -1712,6 +1762,12 @@ sub friendlytz {
   my $kludge          = $dt->time_zone_short_name() || $tzone;
   my ($nodst, $isdst) = @{ $friendlytzname{$tzone} || [$kludge, $kludge] };
   return ($dt->is_dst()) ? $isdst: $nodst;
+}
+
+sub periodicbiff { # TODO TODO TODO
+  logit("TODO: need to implement periodic biff");
+  # This should check all active/enabled accounts and
+  # NOT assume they all belong to the bot operator.
 }
 
 sub biffhelper {
@@ -1998,7 +2054,7 @@ sub setalarm {
   my $result = addrecord("alarm", $alarm);
   my $id = $db::added_record_db;
   if ($result) {
-    say("Alarm set for " . (friendlytime($dt, (getircuserpref($arg{nick}, 'timezone') || $prefdefault{timezone} || $servertz), 'alarm'))
+    say("Alarm set for " . (friendlytime($dt, (getircuserpref( __NETWORK_ID__, $arg{nick}, 'timezone') || $prefdefault{timezone} || $servertz), 'alarm'))
         . " ($id)", %arg);
   } else {
     logit("Failed to set alarm: " . $dt . " %arg ($text)");

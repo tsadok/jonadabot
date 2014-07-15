@@ -57,20 +57,30 @@ sub dbconn {
 
 sub getconfigvarordie {
   my ($p, $n, $v) = @_;
+  my $network = (defined $n) ? qq[ for network $n] : '';
   if (wantarray) {
     my @answer = getconfigvar(@_);
-    croak "You MUST configure at least one value for config variable $v for network $n in profile $p" if not @answer;
+    croak "You MUST configure at least one value for config variable $v$network in profile $p" if not @answer;
     return @answer;
   } else {
     my $answer = getconfigvar(@_);
-    croak "You MUST configure a value for config variable $v for network $n in profile $p" if not $answer;
+    croak "You MUST configure a value for config variable $v$network in profile $p" if not $answer;
     return $answer;
   }
 }
 sub getconfigvar {
   my ($profile, $network, $varname) = @_;
-  my @cfgvar = findrecord('config', 'cfgprofile', $profile, networkid => $network,
-                          'varname', $varname, 'enabled', 1);
+  my @cfgvar;
+  if (defined $network) {
+    @cfgvar = findrecord('config', cfgprofile => $profile,
+                                   networkid  => $network,
+                                   varname    => $varname,
+                                   enabled => 1);
+  } else {
+    @cfgvar = findrecord('config', cfgprofile => $profile,
+                                   varname    => $varname,
+                                   enabled => 1);
+  }
   if (wantarray) {
     return map { $$_{value} } @cfgvar;
   } elsif (1 >= scalar @cfgvar) {

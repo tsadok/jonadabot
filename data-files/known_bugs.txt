@@ -12,8 +12,10 @@ Known bugs:
    probably not working right.  Also, I want to add the ability to
    re-initialize all the filewatch pipes, both on-demand and also on a
    schedule (because of things like logrotate).
+ * The !backscroll feature does not treat CTCP ACTIONs specially.
 
 Features Wanted:
+ * reboundchance should apply to more things than just tea.
  * TODO-list management:
      !todo set Remember to blah blah blah
      !todo list (just list the id numbers of your todo items)
