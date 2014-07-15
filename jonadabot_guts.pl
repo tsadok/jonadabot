@@ -374,7 +374,7 @@ sub checkpingtimes {
     return if $limit > $now;
     logit("Past ping limit ($lim seconds), pinging $bot");
     my $pingcmd = getconfigvar($cfgprofile, qq[customping_$bot]) || "!ping";
-    say("!ping", channel => 'private', sender => $bot);
+    say($pingcmd, channel => 'private', sender => $bot);
     push @bot, $bot;
   }
   logit("Past all ping limits.  Restarting...");
