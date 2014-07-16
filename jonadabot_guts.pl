@@ -919,15 +919,14 @@ sub handlemessage {
           networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
   } elsif ($text =~ /^!show(?:pref)?\s*(\w*)/) {
-    # TODO: XXX YOU ARE HERE, doing mulitnetwork infrastructure work, adding in $netid to a lot of function calls.
     my ($var) = ($1);
     if ($var) {
       my $value = getircuserpref($netid, $sender, $var);
       say("$var == $value", channel => 'private', sender => $sender);
     } else {
-      my @possible = uniq('timezone', getconfigvar($cfgprofile, 'userpref'));
+      my @possible = uniq('timezone', getconfigvar($cfgprofile, undef, 'userpref'));
       say("Prefs you can set: " . (join ", ", @possible),
-          channel => $howtorespond, sender => $sender, fallbackto => 'private');
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
   } elsif ($text =~ /^!set(?:pref)?\s*(\w+)\s+(.*)/) {
     my ($var, $value) = ($1, $2);
@@ -938,23 +937,28 @@ sub handlemessage {
       logit("potential timezone value: $tz") if $debug{preference} > 1;
       my ($tzname) = grep { $_ eq $tz } DateTime::TimeZone->all_names();
       $tzname ||= $prefdefault{timezone};
-      setircuserpref(__NETWORK_ID__, $sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
-    } elsif ($var eq '') {# TODO: report all set prefs, not just timezone
-      my $tz = getircuserpref($netid, $sender, 'timezone');
-      say('timezone: $tz',
-          channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+      setircuserpref($netid, $sender, $var, $value,
+                     channel => ($irc{$netid}{okdom}{$howtorespond} ? $howtorespond : 'private'));
+    } elsif ($var eq '') { # Report all set prefs
+      my @pref = grep { $$_[1] } map { [ $_ => getircuserpref($netid, $sender, $_) ]
+                                     } uniq('timezone', getconfigvar($cfgprofile, undef, 'userpref'));
+      say(((scalar @pref) ? (join "; ", map { qq[$$_[0]: $$_[1]] } @pref)
+                          : "No preferences set for $sender"),
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     } else {
-      my @possiblepref = getconfigvar($cfgprofile, 'userpref');
+      my @possiblepref = getconfigvar($cfgprofile, undef, 'userpref');
       if (grep { $_ eq $var } @possiblepref) {
-        setircuserpref(__NETWORK_ID__, $sender, $var, $value, channel => ($irc{okdom}{$howtorespond} ? $howtorespond : 'private'));
+        setircuserpref($netid, $sender, $var, $value,
+                       channel => ($irc{$netid}{okdom}{$howtorespond} ? $howtorespond : 'private'));
       }
     }
   } elsif ($text =~ /^!message (\d+)/) {
-    viewmessage(number => $1, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    viewmessage(number => $1, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!tell (\w+)\s*(.*)/) {
     my ($target, $msg) = ($1, $2);
     my $result = addrecord('memorandum', +{
                                            sender  => $sender,
+                                           networkid => $netid,
                                            channel => $howtorespond,
                                            target  => $target,
                                            thedate => DateTime::Format::ForDB(DateTime->now(@tz)),
@@ -965,24 +969,22 @@ sub handlemessage {
       my $r = getrecord('memorandum', $id);
       if ($$r{message} eq $msg) {
         say("Ok, $$r{sender}, I'll let $$r{target} know.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private' );
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private' );
       } else {
         say("Oh, dear, something seems to be wrong with my message storage facility.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private', );
+            networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private', );
       }
     } else {
       say("Hmm... something seems to be wrong with my message storage facility.",
-          channel => $howtorespond, sender => $sender, fallbackto => 'private', );
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private', );
     }
   } elsif ($text =~ /^!seen (.*)/) {
     my ($whoever) = ($1);
-    #my $when = $irc{channel}{lc ($wherever || $howtorespond)}{seen}{lc $whoever};
-    #my $where = $wherever ? "in $wherever" : "here";
     my $answer = "/me has not seen $whoever lately.";
-    my @s = findrecord('seen', nick => $whoever);
-    my %self = map { $_ => 1 } @{$irc{nick}};
+    my @s = findrecord('seen', networkid => $netid, nick => $whoever);
+    my %self = map { $_ => 1 } @{$irc{$netid}{nick}};
     if ($self{$whoever}) {
-      $answer = "Hi, $sender.";
+      $answer = greeting() . ", $sender.";
       $fallbacktoprivate = 1;
     } elsif (@s) {
       my $s = $s[0];
@@ -991,21 +993,20 @@ sub handlemessage {
                        getircuserpref($netid, $sender, 'timezone')) . ".";
     }
     if (($howtorespond eq 'private') or ($irc{okdom}{$howtorespond})) {
-      say($answer, channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
+      say($answer, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     } elsif ($irc{master}{$sender} or $fallbacktoprivate) {
-      #$answer =~ s/\bhere\b/in $howtorespond/;
-      say($answer, channel => 'private', sender => $sender, fallbackto => 'private' );
+      say($answer, networkid => $netid, channel => 'private', sender => $sender, fallbackto => 'private' );
     }
   } elsif ($text =~ /^!(time|date)/) {
     my $date = friendlytime(DateTime->now(@tz), getircuserpref($netid, $sender, 'timezone'), 'announce');
-    say ($date, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    say ($date, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!(?:rot13|ebg13)/i) {
     my ($blah) = $text =~ /^!rot13\s*(.*)/i;
     $blah =~ tr/A-Za-z/N-ZA-Mn-za-m/;
-    say("!ebg13 $blah", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+    say("!ebg13 $blah", networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
   } elsif ($text =~ /^!alarm/i) {
     logit($text) if $debug{alarm};
-    say("Hmm...", channel => 'private', sender => $sender) if $debug{alarm} > 6;
+    say("Hmm...", networkid => $netid, channel => 'private', sender => $sender) if $debug{alarm} > 6;
     # TODO: document this feature in !help
     if ($text =~ m~^!alarm set (.+)~i) {
       my ($setparams) = ($1);
@@ -1057,12 +1058,15 @@ sub handlemessage {
         logit("dt " . $dt->ymd() . " at " . $dt->hms(), 3) if $debug{alarm} > 2;
         $message ||= "It's " . friendlytime($dt, $tz, 'alarm') . "!";
         my $serverdt = $dt->set_time_zone($servertz);
-        setalarm($serverdt, $message, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+        setalarm($serverdt, $message,
+                 networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } else {
-        say("Sorry, I did not understand that date and time.", channel => 'private', sender => $sender);
+        say("Sorry, I did not understand that date and time.",
+            networkid => $netid, channel => 'private', sender => $sender);
       }
     } elsif ($text =~ /!alarm snooze/i) {
       #TODO: snooze the alarm that went off most recently.
+      # XXX YOU ARE ABOUT HERE
     } elsif ($text =~ /!alarm (\d+)\s*(.*)/) {
       my ($num, $rest) = ($1, $2);
       my $alarm = getrecord('alarm', $num);
@@ -1594,7 +1598,7 @@ sub handlemessage {
           channel => $howtorespond, sender => $sender, fallbackto => 'private');
     } else {
       for my $num (map { $$_{id} } @msg) {
-        viewmessage(number => $num, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+        viewmessage(number => $num, networkid => __NETWORK_ID__, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }
     }
   } elsif ($sender and $irc{master}{$sender}) {
@@ -1682,13 +1686,20 @@ sub haveseenlately {
 sub viewmessage {
   my (%arg) = @_;
   my $r = getrecord('memorandum', $arg{number});
-  if ($$r{target} eq $arg{sender}) {
+  if (($$r{target} eq $arg{sender}) and ($$r{networkid} eq $arg{networkid})) {
     my $dt = DateTime::Format::FromDB($$r{thedate});
     my $date = friendlytime($dt, getircuserpref($$r{networkid}, $$r{target}, 'timezone') || $prefdefault{timezone} || $servertz);
     say(qq[$sender: $$r{sender} says, $$r{message} (in $$r{channel}, $date)], %arg);
     $$r{status} = 2;
     $$r{statusdate} = DateTime::Format::ForDB(DateTime->now(@tz));
     updaterecord('memorandum', $r);
+  } elsif ($$r{target} eq $arg{sender}) { # TODO: support cross-network aliases
+    my $network = getrecord("ircnetwork", $$r{networkid});
+    if (ref $network) {
+      say("$sender, that message is for delivery on $$network{networkname}", %arg);
+    } else {
+      logit("ERROR: not network record for network $$network{id}, referenced in memorandum $arg{number}");
+    }
   } else {
     say("$sender, that message is for $$r{target}.", %arg);
   }
@@ -2045,6 +2056,7 @@ sub setalarm {
   my ($dt, $text, %arg) = @_;
   $utcdt = $dt->clone()->set_time_zone("UTC");
   my $alarm = +{ nick      => ($arg{nick} || $arg{sender}),
+                 networkid => $arg{networkid},
                  sender    => $arg{sender},
                  setdate   => DateTime::Format::ForDB(DateTime->now( time_zone => "UTC" )),
                  alarmdate => DateTime::Format::ForDB($utcdt),
