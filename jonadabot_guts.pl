@@ -619,6 +619,14 @@ sub debuginfo {
     } else {
       return "Unknown debug variable: $var";
     }
+  } elsif ($item =~ /sitre/) {
+    return join "; ", map {
+      my $ch = $_;
+      "$ch:" . "[" . (join ", ",
+                      grep {
+                        $irc{situationalregex}{$ch}{enabled};
+                      } keys %{$irc{situationalregex}{$ch}}) . "]";
+    } keys %{$irc{situationalregex}};
   }
   return "I know nothing, nothing.";
 }
@@ -1445,8 +1453,10 @@ sub handlemessage {
       exit 2;
     } elsif ($text =~ /^!reload regex/) {
       logit("Reloading regexen at the request of $sender: $regexen");
+      delete $irc{situationalregex};
       do $regexen;
-      say("Regular expressions reloaded.", channel => $howtorespond, fallbackto => 'private', sender => $sender);
+      say("Regular expressions reloaded; situational regexes flushed.",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload (?:extra)?\s*(?:sub|routine)/) {
       logit("Reloading extrasubs at the request of $sender: $extrasubs");
       do $extrasubs;
@@ -1533,6 +1543,27 @@ sub handlemessage {
         }
       } else {
         logit("Not responding to custom bottrigger $$t{bottrigger} in non-included channel $howtorespond") if $debug{bottrigger};
+      }
+    }
+  } elsif (ref $irc{situationalregex}{$howtorespond}) {
+    # These can be set (and later disabled again) by custom routines
+    # (e.g. bottrigger handlers), to enable context-sensitive
+    # responses to certain words and phrases.  For an example,
+    # see the hangman routine in jonadabot_extrasubs_sample.pl
+    logit("Checking situational regexes") if $debug{sitregex} > 1;
+    foreach my $k (keys %{$irc{situationalregex}{$howtorespond}}) {
+      if ($irc{situationalregex}{$howtorespond}{$k}{enabled} and
+          (defined $irc{situationalregex}{$howtorespond}{$k}{regex}) and
+          (ref $irc{situationalregex}{$howtorespond}{$k}{callback})) {
+        logit("Checking situational regex: $k",3) if $debug{sitregex} > 2;
+        if ($text =~ $irc{situationalregex}{$howtorespond}{$k}{regex}) {
+          $irc{situationalregex}{$howtorespond}{$k}{callback}->($k, $text,
+                                                                channel => $howtorespond,
+                                                                sender  => $sender,
+                                                               );
+        }
+      } else {
+        logit("Situational regex disabled: $k") if $debug{sitregex} > 3;
       }
     }
   } elsif ($irc{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots.
