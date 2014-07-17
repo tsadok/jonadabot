@@ -1552,6 +1552,8 @@ sub handlemessage {
     # see the hangman routine in jonadabot_extrasubs_sample.pl
     logit("Checking situational regexes") if $debug{sitregex} > 1;
     foreach my $k (keys %{$irc{situationalregex}{$howtorespond}}) {
+      logit("$k: e$irc{situationalregex}{$howtorespond}{$k}{enabled}, r$irc{situationalregex}{$howtorespond}{$k}{regex}")
+        if $debug{sitregex} > 3;
       if ($irc{situationalregex}{$howtorespond}{$k}{enabled} and
           (defined $irc{situationalregex}{$howtorespond}{$k}{regex}) and
           (ref $irc{situationalregex}{$howtorespond}{$k}{callback})) {

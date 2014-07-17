@@ -45,7 +45,7 @@ our %routine = (
                     }
                     if ($arg{channel} ne 'private') {
                       my $ch = $arg{channel}; # lexical closure
-                      $irc{situationalregex}{$ch}}{hangman} =
+                      $irc{situationalregex}{$ch}{hangman} =
                         +{  enabled  => 1,
                             regex    => qr/^([a-z]|$word|details?|guess(?:es)?|state|letters?|bank)$/i,
                             callback => sub { my ($rekey, $txt, %x) = @_;
