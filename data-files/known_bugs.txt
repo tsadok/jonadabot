@@ -15,6 +15,9 @@ Known bugs:
  * The !backscroll feature does not treat CTCP ACTIONs specially.
 
 Features Wanted:
+ * If for any reason the bot ends up with nick_ instead of nick,
+   it should set a timer and automatically try again for its
+   preferred nick until it gets it.
  * reboundchance should apply to more things than just tea.
  * TODO-list management:
      !todo set Remember to blah blah blah

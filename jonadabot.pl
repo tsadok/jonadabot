@@ -29,6 +29,7 @@ our $version          = '007';
 our $devstatus        = 'alpha';
 our $gitpage          = 'https://gitorious.org/jonadabot';
 our $logfile          = "/var/log/jonadabot_$version.log";
+
 our $utilsubs         = "jonadabot_utilsubs.pl";
 our $extrasubs        = "jonadabot_extrasubs.pl";
 our $guts             = "jonadabot_guts.pl";
@@ -36,6 +37,7 @@ our $regexen          = "jonadabot_regexes.pl";
 our $teacode          = "jonadabot_teacode.pl";
 our $dbcode           = "jonadabot_db.pl";
 our $watchlog         = "jonadabot_filewatch.pl";
+
 our $defaultusername  = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
 
 

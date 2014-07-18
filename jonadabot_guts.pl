@@ -992,9 +992,9 @@ sub handlemessage {
         . friendlytime(DateTime::Format::MySQL->parse_datetime($$s{whenseen}),
                        getircuserpref($netid, $sender, 'timezone')) . ".";
     }
-    if (($howtorespond eq 'private') or ($irc{okdom}{$howtorespond})) {
+    if (($howtorespond eq 'private') or ($irc{$netid}{okdom}{$howtorespond})) {
       say($answer, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
-    } elsif ($irc{master}{$sender} or $fallbacktoprivate) {
+    } elsif ($irc{$netid}{master}{$sender} or $fallbacktoprivate) {
       say($answer, networkid => $netid, channel => 'private', sender => $sender, fallbackto => 'private' );
     }
   } elsif ($text =~ /^!(time|date)/) {
@@ -1066,14 +1066,18 @@ sub handlemessage {
       }
     } elsif ($text =~ /!alarm snooze/i) {
       #TODO: snooze the alarm that went off most recently.
-      # XXX YOU ARE ABOUT HERE
     } elsif ($text =~ /!alarm (\d+)\s*(.*)/) {
       my ($num, $rest) = ($1, $2);
       my $alarm = getrecord('alarm', $num);
       if (not $alarm) {
-        say("No such alarm: $num", channel => 'private', sender => $sender);
-      } elsif (lc($$alarm{nick}) ne lc $sender) {
-        say("Not your alarm: $num", channel => 'private', sender => $sender);
+        say("No such alarm: $num",
+            networkid => $netid, channel => 'private', sender => $sender);
+      } elsif ($$alarm{networkid} ne $netid) { # TODO: maybe support cross-network nick aliases
+        say("That alarm is not for this IRC network.",
+            networkid => $netid, channel => 'private', sender => $sender);
+      } elsif (lc($$alarm{nick}) ne lc $sender) { # TODO: support nick aliases
+        say("Not your alarm: $num",
+            networkid => $netid, channel => 'private', sender => $sender);
       } elsif ($rest =~ /snooze\s*(\d*)\s*(minutes|hours|days)?/) {
         my ($num, $unit) = ($1, $2);
         $num  ||= 10;
@@ -1081,7 +1085,8 @@ sub handlemessage {
         my $snoozedt = DateTime->now( time_zone => "UTC" )->add( $unit => $num );
         $$alarm{snoozetill} = DateTime::Format::ForDB($snoozedt);
         updaterecord("alarm", $alarm);
-        say("Snoozing alarm $$alarm{id} for $num $unit", channel => 'private', sender => $sender);
+        say("Snoozing alarm $$alarm{id} for $num $unit",
+            networkid => $netid, channel => 'private', sender => $sender);
       } else {
         my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
         logit("alarm dt: " . $alarmdt->hms()) if $debug{alarm};
@@ -1089,13 +1094,14 @@ sub handlemessage {
                                               || $prefdefault{timezone} || $servertz));
         say("Alarm $$alarm{id} viewed " . ($$alarm{viewcount} || 0) . " time(s), "
             . ($$alarm{status} ? 'inactive' : "set to go off $forwhen") . ".",
-            channel => 'private', sender => $sender);
+            networkid => $netid, channel => 'private', sender => $sender);
         my $willsay = $alarm{status} ? "said" : "will say";
-        say(qq[Alarm $willsay "$$alarm{message}".], channel => 'private', sender => $sender);
+        say(qq[Alarm $willsay "$$alarm{message}".],
+            networkid => $netid, channel => 'private', sender => $sender);
       }
     } elsif ($text =~ /!alarms\s*(.*)/) {
       my @extraarg = split /\s+/, $1;
-      my @alarm = findrecord('alarm', 'nick', $sender);
+      my @alarm = findrecord('alarm', networkid => $netid, nick => $sender);
       if (grep { /inactive/ } @extraarg) {
         @alarm = grep { $$_{status} } @alarm;
       } else {
@@ -1109,82 +1115,95 @@ sub handlemessage {
       }
       if (0 >= scalar @alarm) {
         say("You currently have no " . (@extraarg ? "(@extraarg) " : '') . "alarms set.",
-            channel => 'private', sender => $sender);
-      } elsif ((getconfigvar($cfgprofile, 'maxlines') || 12) >= scalar @alarm) {
+            networkid => $netid, channel => 'private', sender => $sender);
+      } elsif ((getconfigvar($cfgprofile, $netid, 'maxlines') || 12) >= scalar @alarm) {
         for my $alarm (@alarm) {
           my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
           my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
                                                 || $prefdefault{timezone} || $servertz));
-          say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
+          say("Alarm $$alarm{id} set to go off $forwhen.",
+              networkid => $netid, channel => 'private', sender => $sender);
         }
       } else {
         say("" . @alarm . " alarms: " . (join ", ", map { $$_{id} } @alarm),
-            channel => 'private', sender => $sender);
+            networkid => $netid, channel => 'private', sender => $sender);
       }
     }
-  } elsif (((($text =~ /Ars[ie]no|$irc{nick}|jonadabot/i) or ($howtorespond eq 'private')) and
+  } elsif (((($text =~ /Ars[ie]no|$irc{$netid}{nick}|jonadabot/i) or ($howtorespond eq 'private')) and
            (($text =~ /are(?:n't)? you (a|an|the|human|\w*bot|puppet)/i) or ($text =~ /(who|what) are you/i)
             or ($text =~ /(who|what) is (Ars[ie]no|jonadabot)/i)))
            or ($text =~ /^!about/)) {
     my $size = 0; $size += $_ for map { -s $_ } $0, $guts, $utilsubs, $extrasubs, $regexen, $teacode, $dbcode, $watchlog ;
     say("/me is a Perl script, $devname version $version $devstatus, $size bytes, see also $gitpage",
-        channel => $howtorespond, sender => $sender, fallbackto => 'private' );
-    say("I was originally written by $author and am currently operated by $irc{oper}, who frequents this same network.",
-        channel => $howtorespond, sender => $sender, fallbackto => 'private' );
-  } elsif ($text =~ /Ars[ie]no.*(pretty|nice|lovely|cute)\s+name/i) {
-    say("Thank you.", channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
+        networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private' );
+    say("I was originally written by $author and am currently operated by $irc{$netid}{oper}, who frequents this same network.",
+        networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private' );
+  } elsif ($text =~ /(Ars[ie]no|$irc{$netid}{nick}).*(pretty|nice|lovely|cute)\s+name/i) {
+    say("Thank you.",
+        networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
   } elsif ($text =~ /^Xyzzy/i and (($howtorespond eq 'private') or (12 > rand(100)))) {
     my @msg = ("You are inside a building, a well house for a large spring.",
-               "You are in a debris room filled with stuff washed in from the surface.",);
-    say($msg[int rand @msg], channel => $howtorespond, sender => $sender );
+               "You are in a debris room filled with stuff washed in from the surface."
+               "Plugh",);
+    say($msg[int rand @msg],
+        networkid => $netid, channel => $howtorespond, sender => $sender );
   } elsif ($text =~ /^!help\s*(.*)/) {
     my ($topic) = $1;
     if ($topic) {
-      say(helpinfo($1), channel => $howtorespond, sender => $sender, fallbackto => 'private');
+      say(helpinfo($1), networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     } else {
-      my $info = getconfigvar($cfgprofile, 'helpurl') || helpinfo();
-      say($info, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+      my $info = getconfigvar($cfgprofile, $netid, 'helpurl') || helpinfo();
+      say($info, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     }
   } elsif ($text =~ /^!say\s*to\s*(\S+)\s*(.+)/) {
     my ($target, $thing) = ($1, $2);
-    if ($irc{master}{$sender}) {
+    if ($irc{$netid}{master}{$sender}) {
       if ($target =~ /^[#]/) {
-        say($thing, channel => $target, sender => $sender, fallbackto =>'private');
+        say($thing, networkid => $netid, channel => $target, sender => $sender, fallbackto =>'private');
       } else {
-        say($thing, channel => 'private', sender => $sender);
+        say($thing, networkid => $netid, channel => 'private', sender => $sender);
       }
     } else {
-      say("Tell them yourself, $sender", channel => 'private', sender => $sender);
+      say("Tell them yourself, $sender",
+          networkid => $netid, channel => 'private', sender => $sender);
     }
-  } elsif ($text =~ /^!debug (.*)/ and $irc{master}{$sender}) {
-    say(debuginfo($1), channel => 'private', sender => $sender );
+  } elsif ($text =~ /^!debug (.*)/ and $irc{$netid}{master}{$sender}) {
+    say(debuginfo($1), networkid => $netid, channel => 'private', sender => $sender );
   } elsif ($text =~ /^!email\s+(\w+)\s*(\S.*?)\s*[:]\s*(.+)/) {
     my ($mnemonic, $subject, $restofmessage) = ($1, $2, $3);
-    my $contact = findrecord("emailcontact", "ircnick", $sender, "mnemonic", $mnemonic); # TODO: support nick aliases.
+    my $contact = findrecord("emailcontact", ircnick   => $sender
+                                             networkid => $netid,
+                                             mnemonic  => $mnemonic); # TODO: support nick aliases.
     if ($contact) {
       my $body = $subject . " " . $restofmessage . ($$contact{signature} || "\n --$sender\n");
-      my $from = getconfigvar($cfgprofile, 'operatoremailaddress'); # TODO: allow the operator to establish different from fields for different users.
+      my $from = getconfigvar($cfgprofile, $netid, 'operatoremailaddress');
+      # TODO: allow the operator to establish different from fields for different users.
       my $dest = getrecord("emaildest", $$contact{emaildest});
       my $result = addrecord("mailqueue", +{ tofield   => $$dest{address},
                                              fromfield => $from,
-                                             nick      => $sender,
+                                             ircnetworkid => $netid,
+                                             nick         => $sender,
                                              subject   => $subject,
                                              body      => $body,
                                              bcc       => $$dest{bcc},
                                              enqueued  => DateTime::Format::ForDB(DateTime->now(@tz)),
                                            });
       if ($result) {
-        say("Message enqueued (" . $db::added_record_id . ")", channel => 'private', sender => $sender);
+        say("Message enqueued (" . $db::added_record_id . ")",
+            networkid => $netid, channel => 'private', sender => $sender);
       } else {
         logit("Failed to enqueue email message ($text)");
-        say("Failed to enqueue your message, sorry.", channel => 'private', sender => $sender);
+        say("Failed to enqueue your message, sorry.",
+            networkid => $netid, channel => 'private', sender => $sender);
       }
     } else {
-      say("Email contact not found: $mnemonic (for $sender)", channel => 'private', sender => $sender);
+      say("Email contact not found: $mnemonic (for $sender)",
+          networkid => $netid, channel => 'private', sender => $sender);
     }
   } elsif ($text =~ /^!sms (\w+) (.*)/) {
     my ($target, $msg) = ($1, $2);
-    my $mrec = findrecord("smsmnemonic", ircnick => $sender, mnemonic => $target); # TODO: support nick aliases.
+    my $mrec = findrecord("smsmnemonic", ircnetworkid => $netid, ircnick => $sender, mnemonic => $target);
+    # TODO: support nick aliases.
     if (ref $mrec) {
       my $dest = getrecord("smsdestination", $$mrec{destination});
       if ($dest) {
@@ -1195,7 +1214,8 @@ sub handlemessage {
             my $address = $$dest{phnumber} . '@' . $$gateway{domain};
             my $smtp    = getrecord('smtp'); # TODO: support multiple smtp servers in some way.
             if (ref $smtp) {
-              my $from = getconfigvar($cfgprofile, 'ircemailaddress'); # TODO: allow the operator to set up per-user from fields, with this being just the default
+              my $from = getconfigvar($cfgprofile, $netid, 'ircemailaddress');
+              # TODO: allow the operator to set up per-user from fields, with this being just the default
               if ($from) {
                 my $subject;
                 if ($msg =~ /^(.*?)[[](.*?)[]](.*)$/) {
@@ -1208,46 +1228,47 @@ sub handlemessage {
                                                       tofield    => $address,
                                                       fromfield  => $from,
                                                       body       => $msg,
-                                                      nick       => $sender,
+                                                      ircnetworkid => $netid,
+                                                      nick         => $sender,
                                                       bcc        => ((join ", ", uniq(grep {$_} $$smtp{bcc}, $$mrec{bcc})) || undef),
                                                       subject    => $subject,
                                                       enqueued   => DateTime::Format::ForDB(DateTime->now(@tz)),
                                                      });
                 if ($result) {
                   say("Enqueued mail #" . $db::added_record_id . " to $address",
-                      channel => 'private', sender => $sender );
+                      networkid => $netid, channel => 'private', sender => $sender );
                 } else {
                   say("Enqueing mail to $address seems to have failed.",
-                      channel => 'private', sender => $sender );
+                      networkid => $netid, channel => 'private', sender => $sender );
                 }
               } else {
-                say("No from field; $irc{oper} needs to configure ircemailaddress.",
-                    channel => 'private', sender => $sender );
+                say("No from field; $irc{$netid}{oper} needs to configure ircemailaddress.",
+                    networkid => $netid, channel => 'private', sender => $sender );
               }
             } else {
-              say("No smtp server; $irc{oper} needs to configure one.",
-                  channel => 'private', sender => $sender );
+              say("No smtp server; $irc{$netid}{oper} needs to configure one.",
+                  networkid => $netid, channel => 'private', sender => $sender );
             }
           } else {
             say("No email-to-SMS gateway configured for cellular carrier $$carrier{id}, $$carrier{carriername}.",
-                channel => 'private', sender => $sender );
+                networkid => $netid, channel => 'private', sender => $sender );
           }
         } else {
           say("Could not find cellular carrier number $$dest{carrier} in my database.",
-              channel => 'private', sender => $sender );
+              networkid => $netid, channel => 'private', sender => $sender );
         }
       } else {
         say("No cellphone number on file for $$mrec{mnemonic}, sorry.",
-            channel => 'private', sender => $sender );
+            networkid => $netid, channel => 'private', sender => $sender );
       }
     } else {
       say("No SMS contact info on file for $target, sorry.",
-          channel => 'private', sender => $sender );
+          networkid => $netid, channel => 'private', sender => $sender );
     }
   } elsif ($text =~ /^!biff/) { # TODO: support nick aliases
     logit("!biff command from $sender: $text") if $debug{biff} > 1;
     warn "!biff: no sender means no ownernick" if not $sender;
-    my @box = findrecord("popbox", "ownernick", $sender);
+    my @box = findrecord("popbox", ircnetworkid => $netid, ownernick => $sender);
     logit("I know of " . @box . " pop boxes owned by $sender") if $debug{biff} > 3;
     my %box = map { $$_{mnemonic} => $_ } @box;
     if ($text =~ /^!biff reset/) {
@@ -1258,15 +1279,17 @@ sub handlemessage {
       }
     } elsif ($text =~ /^!biff notif\w*\s*(\w*)/) { # alias for !notifications
       my ($donow) = ($1);
-      my @n = grep { $$_{usernick} eq $sender } findnull("notification", "dequeued");
+      my @n = grep { $$_{usernick} eq $sender and
+                     $$_{ircnetworkid} eq $netid
+                   } findnull("notification", "dequeued");
       my $n;
       my $pending = 'pending';
       if ($donow eq 'sendnow') {
-        my $count = ((getconfigvar($cfgprofile, 'maxlines') || 12) - 1) || 1;
+        my $count = ((getconfigvar($cfgprofile, $netid, 'maxlines') || 12) - 1) || 1;
         $pending = 'remaining';
         while ($count and scalar @n) {
           $n = shift @n;
-          say($$n{message}, channel => 'private', sender => $sender);
+          say($$n{message}, networkid => $netid, channel => 'private', sender => $sender);
           $$n{dequeued} = DateTime::Format::MySQL->format_datetime(DateTime->now(@tz));
           updaterecord("notification", $n);
           select undef, undef, undef, 0.2 if scalar @n; # Don't trip flood protection.
@@ -1274,14 +1297,16 @@ sub handlemessage {
         }
       }
       my $n = scalar @n;
-      say(qq[$n notification(s) remaining], channel => 'private', sender => $sender);
+      say(qq[$n notification(s) remaining],
+          networkid => $netid, channel => 'private', sender => $sender);
     } elsif ($text =~ /^!biff list/) { # list accounts
       logit("Listing mailboxes for $sender") if $debug{biff};
       if (@box) {
         say(("Your POP3 mailboxes: " . join ", ", map { $$_{mnemonic} } @box),
-            channel => 'private', sender => $sender );
+            networkid => $netid, channel => 'private', sender => $sender );
       } else {
-        say("No POP3 mailboxes for $sender", channel => 'private', sender => $sender);
+        say("No POP3 mailboxes for $sender",
+            networkid => $netid, channel => 'private', sender => $sender);
       }
     } elsif ($text =~ /^!biff reload/ and $irc{master}{$sender}) {
       logit("Attempting !biff reload at request of $sender");
@@ -1296,6 +1321,7 @@ sub handlemessage {
         logit("request is for message $msgnum", 4) if $debug{biff} > 2;
         my (@field) = split /\s+/, $therest;
         push @field, 'Subject' if not @field;
+        # TODO:  XXX YOU ARE HERE, putting $netid all over ze place.
         for my $field (grep { $_ ne uc $_ } @field) { # mixed-case fields are header fields
           for my $msg (biffhelper($popbox, $msgnum, [$field], 'suppresswatch', $sender, 'handlemessage (box-specific)')) {
             say($msg, channel => 'private', sender => $sender);
