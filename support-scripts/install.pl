@@ -153,19 +153,43 @@ for my $var (@var) {
 
 ################# Step 4: Copy Files:
 
+for my $customcode (qw(timezone jonadabot_regexes jonadabot_extrasubs)) {
+  my $customfile = $customcode . ".pl";
+  my $samplefile = $customcode . "_sample.pl";
+  if (not -e $customfile) {
+    print "Custom code file not found: $customfile\n";
+    if (-e $samplefile) {
+      if (yesno("Copy sample file ($samplefile) to $customfile?")) {
+        system("cp", $samplefile, $customfile);
+      } else {
+        print "You will need to create $customfile\n";
+      }
+    } else {
+      print "You will need to create $customfile\n";
+    }
+  }
+}
+
+# There are also the sample help files.
 my $helporig = catfile("data-files", "bot-help.html");
-if (-e $helporig) { # we appear to have been run from the jonadabot dir
+if (-e $helporig) {
   for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
     my $dest = catfile($pubdir, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
       system("cp", $helporig, $dest);
       my $cssorig = catfile("data-files", "arsinoe.css");
-      my $cssdest = catfile($$pubdir{value}, "arsinoe.css");
-      if (yesno("Also copy sample stylesheet to $cssdest?")) {
-        system("cp", $cssorig, $cssdest);
+      if (-e $cssorig) {
+        my $cssdest = catfile($$pubdir{value}, "arsinoe.css");
+        if (yesno("Also copy sample stylesheet to $cssdest?")) {
+          system("cp", $cssorig, $cssdest);
+        } else {
+          warn "Not found: $cssorig";
+        }
       }
     }
   }
+} else {
+  warn "Not found: $helporig\n";
 }
 
 ################# Step 5: Email Setup:
