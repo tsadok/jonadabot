@@ -3,28 +3,30 @@
 
 use strict;
 use DBI();
-use DateTime::Format::MySQL;
+use DateTime::Format::Pg;
 use Carp;
 our $servertz;
 
 sub DateTime::Format::ForDB {
   my ($dt) = @_;
-  return DateTime::Format::MySQL->format_datetime($dt) if ref $dt;
+  return DateTime::Format::Pg->format_datetime($dt) if ref $dt;
   carp "Vogon Folk Music: $dt, $@$!";
 }
 
 sub DateTime::Format::FromDB {
   my ($string) = @_;
-  my $dt = DateTime::Format::MySQL->parse_datetime($string);
+  my $dt = DateTime::Format::Pg->parse_datetime($string);
   $dt->set_time_zone($servertz);
   return $dt;
 }
 
+my $db;
 sub dbconn {
   # Returns a connection to the database.
   # Used by the other functions in this file.
-  my $db = DBI->connect("DBI:mysql:database=$dbconfig::database;host=$dbconfig::host",
-                        $dbconfig::user, $dbconfig::password, {'RaiseError' => 1})
+  $db = DBI->connect("dbi:Pg:dbname=$dbconfig::database;host=$dbconfig::host",
+                     $dbconfig::user, $dbconfig::password,
+                     {'RaiseError' => 1, AutoCommit => 1})
     or die ("Cannot Connect: $DBI::errstr\n");
   #my $q = $db->prepare("use $dbconfig::database");
   #$q->execute();
@@ -108,7 +110,7 @@ sub getsince {
 # GETNEW:  @records =   getsince(tablename, datetimefield, datetimeobject);
   my ($table, $dtfield, $dt, $q) = @_;
   die "Too many arguments: getrecord(".(join', ',@_).")" if $q;
-  my $when = DateTime::Format::MySQL->format_datetime($dt);
+  my $when = DateTime::Format::ForDB($dt);
   my $db = dbconn();
   $q = $db->prepare("SELECT * FROM $table WHERE $dtfield >= ?");  $q->execute($when);
   my @answer; my $r;
@@ -386,4 +388,4 @@ sub deleterecord {
   $q->execute($id);
 }
 
-42;
+1;

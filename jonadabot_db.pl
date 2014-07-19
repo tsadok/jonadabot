@@ -29,9 +29,95 @@ require "jonadabot_dbconfig.pl";
 
 if ($dbconfig{rdbms} eq 'mysql') {
   do "jonadabot_db_mysql.pl";
-} # TODO: support additional RDBMS options here
+} elsif ($dbconfig{rdbms} eq 'postgres') {
+  do "jonadabot_db_postgres.pl";
+} # TODO: support additional RDBMS options here.  Notably, I want to do SQLite support.
 else {
   die "Unsupported/unknown/misspelled RDBMS: '$dbconfig{rdbms}'";
 }
+
+# Some database functions are not specific to any particular RDBMS
+# (because they call lower-level DB functions to do any RDBMS-specific
+# parts).  Such functions follow below.  However, anything with any
+# actual SQL in it should bo in the RDBMS-specific code.
+
+sub getconfigvarordie {
+  my ($p, $v) = @_;
+  if (wantarray) {
+    my @answer = getconfigvar(@_);
+    croak "You MUST configure at least one value for config variable $v in profile $p" if not @answer;
+    return @answer;
+  } else {
+    my $answer = getconfigvar(@_);
+    croak "You MUST configure a value for config variable $v in profile $p" if not $answer;
+    return $answer;
+  }
+}
+sub getconfigvar {
+  my ($profile, $varname) = @_;
+  my @cfgvar = findrecord('config', 'cfgprofile', $profile, 'varname', $varname, 'enabled', 1);
+  if (wantarray) {
+    return map { $$_{value} } @cfgvar;
+  } elsif (1 >= scalar @cfgvar) {
+    return $cfgvar[0]{value};
+  } else {
+    warn "Too many enabled config values for $varname in profile $profile, only the first will be used.";
+    return $cfgvar[0]{value};
+  }
+}
+
+sub getvariable {
+  my ($name, $userid) = @_;
+  my $r = ($userid and findrecord('userpref', 'name', $name, 'user', $userid)) || findrecord('variable', 'name', $name);
+  if (ref $r) {
+    if (defined $$r{string}) { return $$r{string}; } # So, yeah, the empty string is a possible value.
+    return $$r{number} || undef;
+  } else {
+    #carp "Failed to find variable: $name";
+    return;
+  }
+}
+
+sub setuserpref {
+  my ($name, $value, $userid) = @_;
+  my $r = findrecord('userpref', 'name', $name, 'user', $userid);
+  if (ref $r) {
+    if ($value =~ /^\d+$/) { $$r{number} = $value; $$r{string} = undef; }
+    else { $$r{string} = $value; }
+    updaterecord('userpref', $r);
+  } else {
+    my $r = +{ user => $userid, name => $name };
+    if ($value =~ /^\d+$/) { $$r{number} = $value; }
+    else { $$r{string} = $value; }
+    addrecord('userpref', $r);
+  }
+}
+
+sub clearuserpref {
+  my ($name, $userid) = @_;
+  my $r = findrecord('userpref', 'name', $name, 'user', $userid);
+  if (ref $r) {
+    deleterecord('userpref', $r);
+  }
+}
+
+sub setvariable {
+  my ($name, $value, $userid) = @_;
+  if ($userid) {
+    setuserpref($name, $value, $userid);
+  } else {
+    my $r = findrecord('variable', 'name', $name);
+    if (ref $r) {
+      if ($value =~ /^\d+$/) { $$r{number} = $value; }
+      else { $$r{string} = $value; }
+      updaterecord('variable', $r);
+    } else {
+      my $r = +{ name => $name };
+      if ($value =~ /^\d+$/) { $$r{number} = $value; }
+      else { $$r{string} = $value; }
+      addrecord('variable', $r);
+    }}
+}
+
 
 42;
