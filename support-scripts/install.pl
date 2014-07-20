@@ -319,8 +319,12 @@ if (not getrecord("logfile")) {
 print("You will need to edit jonadabot_regexes.pl to add regular expressions for the following watch keys:
   " . commalist(sort { $a cmp $b } uniq(@regexkey)) . "\n") if @regexkey;
 
+################# Step 8: Clan Setup:
 
-################# Step 8: Testing
+# TODO: offer to scrape clan member names off the junethack website,
+# ask for the IRC nicks, and populate those tables too.
+
+################# Step 9: Testing
 # TODO
 
 exit 0;
