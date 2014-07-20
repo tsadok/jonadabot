@@ -44,23 +44,40 @@ construct the DB config file for you.\n";
       my $dbpass = askuser("Enter a password for the DB login (default: $dfltpass)")
         || dfltpass;
       open DBCFG, ">", "jonadabot_dbconfig.pl";
+      my $sigil = '$';
       print DBCFG qq[#!/usr/bin/perl\n\npackage dbconfig;\n
-our $rdbms    = '$rdbms';
-our $database = '$dbname';
-our $host     = '$dbhost';
-our $user     = '$dbuser';
-our $password = '$dbpass';\n
+our ${sigil}rdbms    = '$rdbms';
+our ${sigil}database = '$dbname';
+our ${sigil}host     = '$dbhost';
+our ${sigil}user     = '$dbuser';
+our ${sigil}password = '$dbpass';\n
 %main::dbconfig =\n  (
-   rdbms    => $rdbms,
-   database => $database,
-   host     => $host,
-   user     => $user,
-   password => $password,
+   rdbms    => ${sigil}rdbms,
+   database => ${sigil}database,
+   host     => ${sigil}host,
+   user     => ${sigil}user,
+   password => ${sigil}password,
   );\n];
       close DBCFG;
+      my $atsign = '@';
+      my ($ourhost) = (`/bin/hostname` =~ /(\S+)/);
+      $ourhost = 'localhost' if $dbhost eq 'localhost';
       print "If you haven't done so already, you will need to create the $dbname database\n";
       print "and grant privileges on it to $dbuser and set $dbuser's password to $dbpass\n";
       print "before going any further.\n";
+      if ($rdbms eq 'postgres') {
+        print "To do this, log in to the system as postgres, run psql, and do the following:\n";
+        print " CREATE USER $dbuser WITH PASSWORD '$dbpass';\n";
+        print " CREATE DATABASE $dbname WITH OWNER $dbuser;\n";
+        print "Then if you get 'Ident authentication failed' errors, see the Pg docs,\n";
+        print "edit pg_hba.conf to allow $dbuser to password authenticate for $dbname,\n";
+        print "and restart postgres (typically, /etc/init.d/postgresql restart)\n";
+      } elsif ($rdbms eq 'mysql') {
+        print "To do this, log into the MySQL root account (mysql -u root -p) and do the following:\n";
+        print " CREATE DATABASE $dbname;\n";
+        print " GRANT ALL PRIVILEGES ON ${dbname}.* TO $dbuser${atsign}$ourhost IDENTIFIED BY '$dbpass';\n";
+        print " FLUSH PRIVILEGES;\n";
+      }
       if (not yesno("Have you already created the database and granted the privileges?")) {
         print "Run the install again when you have done so.";
         exit 0;
