@@ -25,6 +25,7 @@ use DBI();
 use Carp;
 our $servertz;
 
+our %dbconfig;
 require "jonadabot_dbconfig.pl";
 
 if ($dbconfig{rdbms} eq 'mysql') {

@@ -94,6 +94,7 @@ our ${sigil}password = '$dbpass';\n
   }
 }
 
+our %dbconfig;
 do $dbcode;
 
 ################# Step 2: Create Tables:
