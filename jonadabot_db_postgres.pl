@@ -229,8 +229,11 @@ sub addrecord {
     use Data::Dumper;
     confess "Unable to add record: $@\n" . Dumper(@_);
   }
-  if ($result) {
-    $db::added_record_id=$q->{mysql_insertid}; # Calling code can read this magic variable if desired.
+  if ($result) { # TODO: this really needs to be tested to verify that it works as intended
+    my $idq = $db->prepare("SELECT currval(pg_get_serial_sequence('$table','id'))");
+    $idq->execute();
+    my $res2 = $idq->fetchrow_arrayref();
+    $db::added_record_id=$$res2[0]; # Calling code can read this magic variable if desired.
   } else {
     warn "addrecord failed: " . $q->errstr;
   }
