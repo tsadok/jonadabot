@@ -101,19 +101,28 @@ do $dbcode;
 
 my $create;
 if ($dbconfig{rdbms} eq 'mysql') {
-  $create = "support-scripts/create-tables_mysql.pl";
+  $create = "support-scripts/create_tables_mysql.pl";
 } elsif ($dbconfig{rdbms} eq 'postgres') {
-  $create = "support-scripts/create-tables_postgres.pl";
+  print "Postgres table creation will fail if some of the tables already exist.\n";
+  if (yesno("Create the tables now?")) {
+    $create = "support-scripts/create_tables_postgres.pl";
+  } else {
+    $create = "__DO_NOT_CREATE__";
+  }
 } elsif ($dbconfig{rdbms} eq 'sqlite') {
-  $create = "support-scripts/create-tables_sqlite.pl";
+  $create = "support-scripts/create_tables_sqlite.pl";
 } else {
   die "Don't know how to create tables for RDBMS: '$dbconfig{rdbms}'";
 }
 
-if (-e $create) {
+if ($create eq "__DO_NOT_CREATE__") {
+  print "Tables not created.  If any are missing, you will need to create them manually.\n";
+} elsif (-e $create) {
   do "$create";
+} elsif ($create) {
+  die "Could not find table creation script ($create)";
 } else {
-  die "Could not find $create";
+  warn "No table creation script is available.  Tables may need to be created manually.";
 }
 
 ################# Step 3: Basic Config:

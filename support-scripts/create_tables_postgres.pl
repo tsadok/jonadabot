@@ -1,6 +1,6 @@
 
-#our $dbcode           = "jonadabot_db.pl";
-#do  $dbcode;
+our $dbcode           = "jonadabot_db.pl";
+do  $dbcode;
 
 my $db = dbconn();
 
@@ -8,16 +8,25 @@ my $db = dbconn();
 # Basic tables used for fundamental functionality of the IRC bot: #
 ###################################################################
 
-sub ctine { # PostgreSQL's verbose equivalent to CREATE TABLE IF NOT EXISTS
+sub ctine {
   my ($tablename, $fields) = @_;
-  return qq[IF EXISTS ( SELECT *
-   FROM  pg_catalog.pg_tables
-   WHERE schemaname = '$dbconfig{dbname}'
-   AND   tablename  = '$tablename'
-  ) THEN RAISE NOTICE 'Table $tablename already exists';
-  ELSE CREATE TABLE $tablename (
-     $fields );
-  END IF;\n];
+  # UGLY HACK: For now don't bother about whether the table exists or
+  # not, just create it unconditionally.  This means that this script
+  # can only ever be run only once if you use Postgres; it cannot be
+  # used again on upgrade to create new additional tables.  Sorry.
+  return qq[CREATE TABLE $tablename (\n    $fields );];
+
+  ## The following is /supposed/ to be PostgreSQL's verbose equivalent
+  ## to CREATE TABLE IF NOT EXISTS, but I must be doing something
+  ## wrong, because starting with IF is a syntax error, apparently.
+  #return qq[IF EXISTS ( SELECT *
+  # FROM  pg_catalog.pg_tables
+  # WHERE schemaname = '$dbconfig{dbname}'
+  # AND   tablename  = '$tablename'
+  #) THEN RAISE NOTICE 'Table $tablename already exists';
+  #ELSE CREATE TABLE $tablename (
+  #   $fields );
+  #END IF;\n];
 }
 
 # configuration variables:
@@ -42,7 +51,7 @@ $q->execute();
 # record of when the bot has started (used for restart-flood protection):
 my $q = $db->prepare(ctine("startuprecord",
     "id           SERIAL,
-     whenstarted  DATETIME,
+     whenstarted  TIMESTAMP,
      psid         int4,
      flags        VARCHAR(255)"));
 $q->execute();
@@ -54,10 +63,10 @@ $q = $db->prepare(ctine("memorandum",
      sender     VARCHAR(255),
      channel    VARCHAR(255),
      target     VARCHAR(255),
-     thedate    datetime,
+     thedate    TIMESTAMP,
      message    VARCHAR(512),
      status     int2,
-     statusdate datetime"));
+     statusdate TIMESTAMP"));
 $q->execute();
 
 # when various IRC users were last seen:
@@ -66,9 +75,9 @@ $q = $db->prepare(ctine("seen",
      networkid  int4,
      nick       VARCHAR(255),
      channel    VARCHAR(255),
-     whenseen   datetime,
+     whenseen   TIMESTAMP,
      details    VARCHAR(512),
-     notes      tinytext"));
+     notes      VARCHAR(255)"));
 $q->execute();
 
 # alarms set by individual IRC users:
@@ -78,11 +87,11 @@ $q = $db->prepare(ctine("alarm",
      networkid  int4,
      nick       VARCHAR(255),
      sender     VARCHAR(255),
-     setdate    datetime,
-     alarmdate  datetime,
+     setdate    TIMESTAMP,
+     alarmdate  TIMESTAMP,
      message    VARCHAR(512),
-     viewed     datetime,
-     snoozetill datetime,
+     viewed     TIMESTAMP,
+     snoozetill TIMESTAMP,
      viewcount  int4,
      flags      VARCHAR(255)"));
 $q->execute();
@@ -93,12 +102,12 @@ $q = $db->prepare(ctine("recurringalarm",
      networkid   int4,
      nick        VARCHAR(255),
      sender      VARCHAR(255),
-     setdate     datetime,
+     setdate     TIMESTAMP,
      dayofmonth  int2,
      dayofweek   int2,
      hour        int2,
      minute      int2,
-     lasttripped datetime,
+     lasttripped TIMESTAMP,
      message     VARCHAR(512),
      flags       VARCHAR(255)"));
 $q->execute();
@@ -122,7 +131,7 @@ $q = $db->prepare(ctine("backscroll",
      networkid      int4,
      channel        VARCHAR(255),
      number         int4,
-     whensaid       datetime,
+     whensaid       TIMESTAMP,
      speaker        VARCHAR(255),
      flags          VARCHAR(255),
      message        VARCHAR(512)"));
@@ -186,7 +195,7 @@ $q = $db->prepare(ctine("smsdestination",
 $q->execute();
 
 # Individual users' mnemonics/abbreviations for SMS destinations:
-$q = $db->prepare(ctine("smsmnemonic"
+$q = $db->prepare(ctine("smsmnemonic",
     "id            SERIAL,
      destination   int4,
      ircnetworkid  int4,
@@ -232,9 +241,9 @@ $q = $db->prepare(ctine("mailqueue",
      nick          VARCHAR(255),
      subject       VARCHAR(512),
      bcc           VARCHAR(255),
-     enqueued      datetime,
+     enqueued      TIMESTAMP,
      trycount      int4,
-     dequeued      datetime,
+     dequeued      TIMESTAMP,
      body          VARCHAR(65535)"));
 $q->execute();
 
@@ -243,8 +252,8 @@ $q = $db->prepare(ctine("notification",
     "id            SERIAL,
      ircnetworkid  int4,
      usernick      VARCHAR(255),
-     enqueued      datetime,
-     dequeued      datetime,
+     enqueued      TIMESTAMP,
+     dequeued      TIMESTAMP,
      flags         VARCHAR(255),
      message       VARCHAR(512)"));
 $q->execute();
@@ -262,7 +271,7 @@ $q = $db->prepare(ctine("logfile",
 $q->execute();
 
 # key things to watch for in those log files:
-$q = $db->prepare(ctine("logfilewatch"
+$q = $db->prepare(ctine("logfilewatch",
     "id           SERIAL,
      logfile      int4,
      matchstring  VARCHAR(255),
@@ -279,8 +288,8 @@ $q->execute();
 $q = $db->prepare(ctine("announcement",
     "id         SERIAL,
      context    VARCHAR(255),
-     whenseen   datetime,
-     expires    datetime,
+     whenseen   TIMESTAMP,
+     expires    TIMESTAMP,
      detail     VARCHAR(512),
      note       VARCHAR(512)"));
 $q->execute();

@@ -218,11 +218,13 @@ sub addrecord {
   my %r = %{$r};
   croak "Record must contain at least one field" if not keys %r;
   my $db = dbconn();
-  my @clauses = map { "$_=?" } sort keys %r;
-  my @values  = map { $r{$_} } sort keys %r;
+  my @field = sort keys %r;
+  my @ques  = map { "?" } @field;
+  my @values  = map { $r{$_} } @field;
   my ($result, $q);
   eval {
-    $q = $db->prepare("INSERT INTO $table SET ". (join ", ", @clauses));
+    $q = $db->prepare("INSERT INTO $table (". (join ", ", @field)
+                      . ") VALUES (" . (join ", ", @ques) . ")");
     $result = $q->execute(@values);
   };
   if ($@) {
