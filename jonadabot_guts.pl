@@ -261,7 +261,7 @@ sub sendqueuedmail {
   $Mail::Sendmail::mailcfg{delay}   = 113;
   $Mail::Sendmail::mailcfg{smtp}    = [ $$server{server} ];
   my $enqdate = DateTime::Format::Mail->format_datetime(
-                   DateTime::Format::MySQL->parse_datetime($$msg{enqueued})->set_time_zone($servertz) );
+                   DateTime::Format::FromDB($$msg{enqueued})->set_time_zone($servertz) );
   my %mail = ( From        => $$msg{fromfield} || getconfigvar($cfgprofile, 'ircemailaddress'),
                Subject     => $$msg{subject} || 'Message from IRC ($irc{nick}[0])',
                Bcc         => $$msg{bcc},
@@ -673,6 +673,14 @@ sub debuginfo {
     } else {
       return "Unknown debug variable: $var";
     }
+  } elsif ($item =~ /sitre/) {
+    return join "; ", map {
+      my $ch = $_;
+      "$ch:" . "[" . (join ", ",
+                      grep {
+                        $irc{situationalregex}{$ch}{enabled};
+                      } keys %{$irc{situationalregex}{$ch}}) . "]";
+    } keys %{$irc{situationalregex}};
   }
   return "I know nothing, nothing.";
 }
@@ -989,7 +997,7 @@ sub handlemessage {
     } elsif (@s) {
       my $s = $s[0];
       $answer = "/me last saw $$s{nick} in $$s{channel} "
-        . friendlytime(DateTime::Format::MySQL->parse_datetime($$s{whenseen}),
+        . friendlytime(DateTime::Format::FromDB($$s{whenseen}),
                        getircuserpref($netid, $sender, 'timezone')) . ".";
     }
     if (($howtorespond eq 'private') or ($irc{$netid}{okdom}{$howtorespond})) {
@@ -1088,7 +1096,7 @@ sub handlemessage {
         say("Snoozing alarm $$alarm{id} for $num $unit",
             networkid => $netid, channel => 'private', sender => $sender);
       } else {
-        my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
+        my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
         logit("alarm dt: " . $alarmdt->hms()) if $debug{alarm};
         my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
                                               || $prefdefault{timezone} || $servertz));
@@ -1118,11 +1126,11 @@ sub handlemessage {
             networkid => $netid, channel => 'private', sender => $sender);
       } elsif ((getconfigvar($cfgprofile, $netid, 'maxlines') || 12) >= scalar @alarm) {
         for my $alarm (@alarm) {
-          my $alarmdt = DateTime::Format::MySQL->parse_datetime($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
+          my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
           my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
                                                 || $prefdefault{timezone} || $servertz));
           say("Alarm $$alarm{id} set to go off $forwhen.",
-              networkid => $netid, channel => 'private', sender => $sender);
+              networkid => $netid,  channel => 'private', sender => $sender);
         }
       } else {
         say("" . @alarm . " alarms: " . (join ", ", map { $$_{id} } @alarm),
@@ -1290,7 +1298,7 @@ sub handlemessage {
         while ($count and scalar @n) {
           $n = shift @n;
           say($$n{message}, networkid => $netid, channel => 'private', sender => $sender);
-          $$n{dequeued} = DateTime::Format::MySQL->format_datetime(DateTime->now(@tz));
+          $$n{dequeued} = DateTime::Format::FromDB(DateTime->now(@tz));
           updaterecord("notification", $n);
           select undef, undef, undef, 0.2 if scalar @n; # Don't trip flood protection.
           $count--;
@@ -1508,8 +1516,10 @@ sub handlemessage {
       exit 2;
     } elsif ($text =~ /^!reload regex/) {
       logit("Reloading regexen at the request of $sender: $regexen");
+      delete $irc{situationalregex};
       do $regexen;
-      say("Regular expressions reloaded.", channel => $howtorespond, fallbackto => 'private', sender => $sender);
+      say("Regular expressions reloaded; situational regexes flushed.",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload (?:extra)?\s*(?:sub|routine)/) {
       logit("Reloading extrasubs at the request of $sender: $extrasubs");
       do $extrasubs;
@@ -1596,6 +1606,29 @@ sub handlemessage {
         }
       } else {
         logit("Not responding to custom bottrigger $$t{bottrigger} in non-included channel $howtorespond") if $debug{bottrigger};
+      }
+    }
+  } elsif (ref $irc{situationalregex}{$howtorespond}) {
+    # These can be set (and later disabled again) by custom routines
+    # (e.g. bottrigger handlers), to enable context-sensitive
+    # responses to certain words and phrases.  For an example,
+    # see the hangman routine in jonadabot_extrasubs_sample.pl
+    logit("Checking situational regexes") if $debug{sitregex} > 1;
+    foreach my $k (keys %{$irc{situationalregex}{$howtorespond}}) {
+      logit("$k: e$irc{situationalregex}{$howtorespond}{$k}{enabled}, r$irc{situationalregex}{$howtorespond}{$k}{regex}")
+        if $debug{sitregex} > 3;
+      if ($irc{situationalregex}{$howtorespond}{$k}{enabled} and
+          (defined $irc{situationalregex}{$howtorespond}{$k}{regex}) and
+          (ref $irc{situationalregex}{$howtorespond}{$k}{callback})) {
+        logit("Checking situational regex: $k",3) if $debug{sitregex} > 2;
+        if ($text =~ $irc{situationalregex}{$howtorespond}{$k}{regex}) {
+          $irc{situationalregex}{$howtorespond}{$k}{callback}->($k, $text,
+                                                                channel => $howtorespond,
+                                                                sender  => $sender,
+                                                               );
+        }
+      } else {
+        logit("Situational regex disabled: $k") if $debug{sitregex} > 3;
       }
     }
   } elsif ($irc{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots.
@@ -2056,7 +2089,7 @@ sub biffnotify {
   addrecord("notification", +{ usernick => $usernick,
                                flags    => 'B', # B means Biff notification
                                message  => $notification,
-                               enqueued => DateTime::Format::MySQL->format_datetime(DateTime->now(@tz)),
+                               enqueued => DateTime::Format::ForDB(DateTime->now(@tz)),
                              });
 }
 
@@ -2073,7 +2106,7 @@ sub processnotification {
       channel => 'private',
       sender  => $recipient,
      );
-  $$n{dequeued} = DateTime::Format::MySQL->format_datetime(DateTime->now(@tz));
+  $$n{dequeued} = DateTime::Format::ForDB(DateTime->now(@tz));
   updaterecord("notification", $n);
   select undef, undef, undef, 0.2 if scalar @n; # Don't trip flood protection.
 }

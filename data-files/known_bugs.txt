@@ -13,6 +13,10 @@ Known bugs:
    re-initialize all the filewatch pipes, both on-demand and also on a
    schedule (because of things like logrotate).
  * The !backscroll feature does not treat CTCP ACTIONs specially.
+ * jonadab_db_postgres.pl probably contains some non-working code,
+   due to SQL differences between database implementations.  A test
+   suite should be developed that exercises all the DB functions
+   so that these issues can be discovered and fixed.
 
 Features Wanted:
  * If for any reason the bot ends up with nick_ instead of nick,
