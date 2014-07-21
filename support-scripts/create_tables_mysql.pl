@@ -8,10 +8,20 @@ my $db = dbconn();
 # Basic tables used for fundamental functionality of the IRC bot: #
 ###################################################################
 
+# IRC networks:
+my $q = $db->prepare("CREATE TABLE IF NOT EXISTS ircnetwork (
+     id           integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     cfgprofile   tinytext,
+     enabled      integer,
+     networkname  tinytext,
+     flags        tinytext)");
+$q->execute();
+
 # configuration variables:
 my $q = $db->prepare("CREATE TABLE IF NOT EXISTS config (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      cfgprofile tinytext,
+     networkid  integer,
      enabled    integer,
      varname    tinytext,
      value      text)");
@@ -20,6 +30,7 @@ $q->execute();
 # individual IRC users' preferences:
 my $q = $db->prepare("CREATE TABLE IF NOT EXISTS userpref (
      id           integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid    integer,
      username     tinytext,
      prefname     tinytext,
      value        text)");
@@ -36,6 +47,7 @@ $q->execute();
 # messages for individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS memorandum (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid  integer,
      sender     tinytext,
      channel    tinytext,
      target     tinytext,
@@ -48,6 +60,7 @@ $q->execute();
 # when various IRC users were last seen:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS seen (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid  integer,
      nick       tinytext,
      channel    tinytext,
      whenseen   datetime,
@@ -58,6 +71,7 @@ $q->execute();
 # alarms set by individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS alarm (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid  integer,
      status     integer,
      nick       tinytext,
      sender     tinytext,
@@ -73,6 +87,7 @@ $q->execute();
 # recurring alarms set by individual IRC users:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS recurringalarm(
      id          integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid   integer,
      nick        tinytext,
      sender      tinytext,
      setdate     datetime,
@@ -89,6 +104,8 @@ $q->execute();
 
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS bottrigger (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid     integer,
+     channel       tinytext,
      bottrigger    tinytext,
      answer        tinytext,
      enabled       integer,
@@ -99,6 +116,7 @@ $q->execute();
 
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS backscroll (
      id             integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     networkid     integer,
      channel        tinytext,
      number         integer,
      whensaid       datetime,
@@ -121,6 +139,7 @@ $q->execute();
 # POP3 mailboxes:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS popbox (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     ircnetworkid     integer,
      ownernick  tinytext,
      address    tinytext,
      popuser    tinytext,
@@ -167,6 +186,7 @@ $q->execute();
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS smsmnemonic (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      destination   integer,
+     ircnetworkid  integer,
      ircnick       tinytext,
      mnemonic      tinytext,
      bcc           tinytext,
@@ -193,6 +213,7 @@ $q->execute();
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS emailcontact (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      mnemonic      tinytext,
+     ircnetworkid  integer,
      ircnick       tinytext,
      emaildest     integer,
      signature     tinytext,
@@ -204,6 +225,7 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS mailqueue (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      tofield       tinytext,
      fromfield     tinytext,
+     ircnetworkid  integer,
      nick          tinytext,
      subject       tinytext,
      bcc           tinytext,
@@ -216,6 +238,7 @@ $q->execute();
 # Notifications about incoming mail that biff has noticed:
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS notification (
      id            integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     ircnetworkid  integer,
      usernick      tinytext,
      enqueued      datetime,
      dequeued      datetime,
@@ -273,6 +296,7 @@ $q->execute();
 $q = $db->prepare("CREATE TABLE IF NOT EXISTS clanmembernick (
      id         integer NOT NULL AUTO_INCREMENT PRIMARY KEY,
      memberid   integer,
+     ircnetworkid integer,
      nick       tinytext,
      prio       integer)");
 $q->execute();
@@ -284,12 +308,3 @@ $q = $db->prepare("CREATE TABLE IF NOT EXISTS clanmembersrvacct (
      servertla     tinytext)");
 $q->execute();
 
-###################################################################
-###################################################################
-####  S E T U P :                                              ####
-###################################################################
-###################################################################
-
-
-
-# TODO: offer to scrape clan member names off the junethack website, ask for the IRC nicks, and populate those tables too.

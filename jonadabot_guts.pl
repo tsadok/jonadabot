@@ -1555,7 +1555,9 @@ sub handlemessage {
       loadconfig();
       logit("Reload complete.", 1);
     }
-  } elsif ($text =~ /^!(\w+)/ and (@rec = findrecord("bottrigger", "bottrigger", $1, "enabled", 1))) {
+  } elsif ($text =~ /^!(\w+)/ and (@rec = grep { ((not $$_{networkid}) or ($$_{networkid} eq $netid)) and
+                                                  ((not $$_{channel}) or ($$_{channel} eq $howtorespond))
+                                               } findrecord("bottrigger", "bottrigger", $1, "enabled", 1))) {
     logit("Can't Happen: no bottrigger record for $text") if not @rec;
     for my $t (@rec) {
       if ((not $$t{channel}) or (index($$t{channel}, $howtorespond) > 0) or ($howtorespond eq 'private')) {
@@ -2086,10 +2088,11 @@ sub biffnotify {
   my @faddr = map { /(\S+[@]\S+)/; $1; } grep { /\S+[@]\S+/ } @from;
   my $from = (scalar @faddr) ? ", from $faddr[0]" : '';
   my $notification = qq[$category message [$detail] received (for $ckey$pnum)$from];
-  addrecord("notification", +{ usernick => $usernick,
-                               flags    => 'B', # B means Biff notification
-                               message  => $notification,
-                               enqueued => DateTime::Format::ForDB(DateTime->now(@tz)),
+  addrecord("notification", +{ usernick  => $usernick,
+                               networkid => __NETWORK_ID__,
+                               flags     => 'B', # B means Biff notification
+                               message   => $notification,
+                               enqueued  => DateTime::Format::ForDB(DateTime->now(@tz)),
                              });
 }
 
