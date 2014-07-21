@@ -24,6 +24,7 @@ sub ctine { # PostgreSQL's verbose equivalent to CREATE TABLE IF NOT EXISTS
 my $q = $db->prepare(ctine('config',
     "id         SERIAL,
      cfgprofile VARCHAR(255),
+     networkid  int4,
      enabled    int2,
      varname    VARCHAR(64),
      value      VARCHAR(65535)"));
@@ -32,6 +33,7 @@ $q->execute();
 # individual IRC users' preferences:
 my $q = $db->prepare(ctine("userpref",
     "id           SERIAL,
+     networkid    int4,
      username     VARCHAR(255),
      prefname     VARCHAR(255),
      value        VARCHAR(512)"));
@@ -48,6 +50,7 @@ $q->execute();
 # messages for individual IRC users:
 $q = $db->prepare(ctine("memorandum",
     "id         SERIAL,
+     networkid  int4,
      sender     VARCHAR(255),
      channel    VARCHAR(255),
      target     VARCHAR(255),
@@ -60,6 +63,7 @@ $q->execute();
 # when various IRC users were last seen:
 $q = $db->prepare(ctine("seen",
     "id         SERIAL,
+     networkid  int4,
      nick       VARCHAR(255),
      channel    VARCHAR(255),
      whenseen   datetime,
@@ -71,6 +75,7 @@ $q->execute();
 $q = $db->prepare(ctine("alarm",
     "id         SERIAL,
      status     int2,
+     networkid  int4,
      nick       VARCHAR(255),
      sender     VARCHAR(255),
      setdate    datetime,
@@ -85,6 +90,7 @@ $q->execute();
 # recurring alarms set by individual IRC users:
 $q = $db->prepare(ctine("recurringalarm",
     "id          SERIAL,
+     networkid   int4,
      nick        VARCHAR(255),
      sender      VARCHAR(255),
      setdate     datetime,
@@ -101,6 +107,8 @@ $q->execute();
 
 $q = $db->prepare(ctine("bottrigger",
     "id            SERIAL,
+     networkid     int4,
+     channel       VARCHAR(255),
      bottrigger    VARCHAR(255),
      answer        VARCHAR(512),
      enabled       int2,
@@ -111,6 +119,7 @@ $q->execute();
 
 $q = $db->prepare(ctine("backscroll",
     "id             SERIAL,
+     networkid      int4,
      channel        VARCHAR(255),
      number         int4,
      whensaid       datetime,
@@ -132,15 +141,16 @@ $q->execute();
 
 # POP3 mailboxes:
 $q = $db->prepare(ctine("popbox",
-    "id         SERIAL,
-     ownernick  VARCHAR(255),
-     address    VARCHAR(255),
-     popuser    VARCHAR(255),
-     poppass    VARCHAR(512),
-     server     int4,
-     mnemonic   VARCHAR(255),
-     count      int4,
-     flags      VARCHAR(255)"));
+    "id            SERIAL,
+     ircnetworkid  int4,
+     ownernick     VARCHAR(255),
+     address       VARCHAR(255),
+     popuser       VARCHAR(255),
+     poppass       VARCHAR(512),
+     server        int4,
+     mnemonic      VARCHAR(255),
+     count         int4,
+     flags         VARCHAR(255)"));
 $q->execute();
 
 # Assignment of watch keys to POP3 mailboxes:
@@ -179,6 +189,7 @@ $q->execute();
 $q = $db->prepare(ctine("smsmnemonic"
     "id            SERIAL,
      destination   int4,
+     ircnetworkid  int4,
      ircnick       VARCHAR(255),
      mnemonic      VARCHAR(255),
      bcc           VARCHAR(255),
@@ -205,6 +216,7 @@ $q->execute();
 $q = $db->prepare(ctine("emailcontact",
     "id            SERIAL,
      mnemonic      VARCHAR(255),
+     ircnetworkid  int4,
      ircnick       VARCHAR(255),
      emaildest     int4,
      signature     VARCHAR(255),
@@ -216,6 +228,7 @@ $q = $db->prepare(ctine("mailqueue",
     "id            SERIAL,
      tofield       VARCHAR(255),
      fromfield     VARCHAR(255),
+     ircnetworkid  int4,
      nick          VARCHAR(255),
      subject       VARCHAR(512),
      bcc           VARCHAR(255),
@@ -228,6 +241,7 @@ $q->execute();
 # Notifications about incoming mail that biff has noticed:
 $q = $db->prepare(ctine("notification",
     "id            SERIAL,
+     ircnetworkid  int4,
      usernick      VARCHAR(255),
      enqueued      datetime,
      dequeued      datetime,
@@ -253,6 +267,7 @@ $q = $db->prepare(ctine("logfilewatch"
      logfile      int4,
      matchstring  VARCHAR(255),
      isregexkey   int2,
+     ircnetworkid int4,
      nicktomsg    VARCHAR(255),
      msgprefix    VARCHAR(255),
      channel      VARCHAR(255),
@@ -283,10 +298,11 @@ $q = $db->prepare(ctine("clanmemberid",
 $q->execute();
 
 $q = $db->prepare(ctine("clanmembernick",
-    "id         SERIAL,
-     memberid   int4,
-     nick       VARCHAR(255),
-     prio       int4"));
+    "id            SERIAL,
+     memberid      int4,
+     ircnetworkid  int4,
+     nick          VARCHAR(255),
+     prio          int4"));
 $q->execute();
 
 $q = $db->prepare(ctine("clanmembersrvacct",
