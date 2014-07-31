@@ -261,8 +261,7 @@ sub sendqueuedmail {
   $Mail::Sendmail::mailcfg{retries} = 7;
   $Mail::Sendmail::mailcfg{delay}   = 113;
   $Mail::Sendmail::mailcfg{smtp}    = [ $$server{server} ];
-  my $enqdate = DateTime::Format::Mail->format_datetime(
-                   DateTime::Format::FromDB($$msg{enqueued})->set_time_zone($servertz) );
+  my $enqdate = DateTime::Format::Mail->format_datetime(DateTime::Format::FromDB($$msg{enqueued}));
   my %mail = ( From        => $$msg{fromfield} || getconfigvar($cfgprofile, 'ircemailaddress'),
                Subject     => $$msg{subject} || 'Message from IRC ($irc{nick}[0])',
                Bcc         => $$msg{bcc},
@@ -1100,7 +1099,7 @@ sub handlemessage {
         say("Snoozing alarm $$alarm{id} for $num $unit",
             networkid => $netid, channel => 'private', sender => $sender);
       } else {
-        my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
+        my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate});
         logit("alarm dt: " . $alarmdt->hms()) if $debug{alarm};
         my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
                                               || $prefdefault{timezone} || $servertz));
@@ -1130,7 +1129,7 @@ sub handlemessage {
             networkid => $netid, channel => 'private', sender => $sender);
       } elsif ((getconfigvar($cfgprofile, $netid, 'maxlines') || 12) >= scalar @alarm) {
         for my $alarm (@alarm) {
-          my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate})->set_time_zone("UTC");
+          my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate});
           my $forwhen = friendlytime($alarmdt, (getircuserpref($netid, $sender, 'timezone')
                                                 || $prefdefault{timezone} || $servertz));
           say("Alarm $$alarm{id} set to go off $forwhen.",
@@ -1302,7 +1301,7 @@ sub handlemessage {
         while ($count and scalar @n) {
           $n = shift @n;
           say($$n{message}, networkid => $netid, channel => 'private', sender => $sender);
-          $$n{dequeued} = DateTime::Format::FromDB(DateTime->now(@tz));
+          $$n{dequeued} = DateTime::Format::ForDB(DateTime->now(@tz));
           updaterecord("notification", $n);
           select undef, undef, undef, 0.2 if scalar @n; # Don't trip flood protection.
           $count--;
@@ -1401,7 +1400,7 @@ sub handlemessage {
         my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
         my $r  = findrecord("backscroll", networkid => $netid, channel => $thechan, number => $i);
         if (ref $r) {
-          my $time    = friendlytime(DateTime::Format::MySQL->parse_datetime($$r{whensaid})->set_time_zone("UTC"), $displaytz, 'hms');
+          my $time    = friendlytime(DateTime::Format::FromDB($$r{whensaid}), $displaytz, 'hms');
           my $speaker = encode_entities($$r{speaker});
           my $message = encode_entities($$r{message});
           logit("index $i, record $$r{id}, speaker $speaker, at $time", 5) if $debug{backscroll} > 8;
