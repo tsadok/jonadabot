@@ -32,14 +32,17 @@ require "jonadabot_dbconfig.pl";
 
 sub DateTime::Format::ForDB {
   my ($dt) = @_;
-  return DateTime::Format::MySQL->format_datetime($dt) if ref $dt;
+  if (ref $dt) {
+    $dt->set_time_zone("UTC");
+    return DateTime::Format::MySQL->format_datetime($dt);
+  }
   carp "Vogon Folk Music: $dt, $@$!";
 }
 
 sub DateTime::Format::FromDB {
   my ($string) = @_;
   my $dt = DateTime::Format::MySQL->parse_datetime($string);
-  $dt->set_time_zone($servertz);
+  $dt->set_time_zone("UTC");
   return $dt;
 }
 
