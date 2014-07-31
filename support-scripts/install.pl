@@ -171,7 +171,7 @@ if (not ref $network) {
 
 for my $var (@var) {
   my ($varname, $default, $question) = @$var;
-  $default = $networkdefault{$ircnetworkname} || $default;
+  $default = $networkdefault{$ircnetworkname}{$varname} || $default;
   if (not getconfigvar($cfgprofile, $$network{id}, $varname)) {
     print "I may ask you some basic config questions.  Try to answer as best you can;\nbut don't worry: you can easily change your answers later in the config table in the database.\n\n"
       if not $questionsasked++;

@@ -182,7 +182,7 @@ for my $ircnet (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1
                   select undef, undef, undef, 0.1;
                   my $nsrv = scalar getconfigvar($cfgprofile, $netid, "ircnickserv");
                   $irc->send_srv( PRIVMSG => ($nsrv),
-                                  "identify " . getconfigvar($cfgprofile, $netid "ircpassword"),
+                                  "identify " . getconfigvar($cfgprofile, $netid, "ircpassword"),
                                 ); # This is the authentication step.
                   select undef, undef, undef, 0.1;
                   my $nick = $nick[0];
@@ -267,7 +267,7 @@ warn "Stage " . (shift @stage) . " (connected/waiting)";
 }
 logit("Waiting for all condvars to send...");
 for my $netid (grep { /^\d+$/ } keys %irc) {
-  $irc{$netd}{condvar}->recv;
+  $irc{$netid}{condvar}->recv;
 }
 logit("Done waiting; all condvars are in.");
 warn "Stage " . (shift @stage) . " (waited)";

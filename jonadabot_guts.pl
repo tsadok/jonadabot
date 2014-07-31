@@ -91,11 +91,12 @@ sub loadconfig {
                         },
             maxlines => getconfigvar($cfgprofile, $$network{id}, 'maxlines') || 12,
             pinglims => [getconfigvar($cfgprofile, $$network{id}, 'pingtimelimit')],
-          pingtime => DateTime->now( @tz ),
+            pingtime => DateTime->now( @tz ),
             pingbots => [getconfigvar($cfgprofile, $$network{id}, 'pingbot')], # Bots that will respond to !ping in a private /msg
             siblings => [getconfigvar($cfgprofile, $$network{id}, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
-         );
-  undef $irc{colorcache}; # This will get loaded when next used.
+           );
+    undef $irc{__COLORCACHE__}; # This will get loaded when next used.
+  }
 }
 loadconfig();
 
@@ -221,7 +222,7 @@ sub checksiblings {
   my $once   = DateTime::Format::ForDB($now->clone()->subtract( minutes => $mins ));
   my $twice  = DateTime::Format::ForDB($now->clone()->subtract( minutes => (2 * $mins)));
   my $thrice = DateTime::Format::ForDB($now->clone()->subtract( minutes => (3 * $mins)));
-  for my $sibr grep { $$_{value} and $$_{networkid} } (@sibrec) {
+  for my $sibr (grep { $$_{value} and $$_{networkid} } @sibrec) {
     my $sib = $$sibr{value};
     my $nid = $$sibr{networkid};
     # TODO: support nick aliases
@@ -372,6 +373,7 @@ sub updatepingtimes {
   logit("Updated pingtime on network $netid from $oldtime to $irc{$netid}{pingtime}",3) if $debug{pingtime} > 6;
   updateseen($irc{pingtime}, $netid, $sender, $channel, $text);
 }
+
 sub checkpingtimes {
  my $now   = DateTime->now(@tz);
  logit("Checking ping times at " . $now->hms(),3) if $debug{pingtime} > 3;
@@ -435,6 +437,7 @@ sub greeting { # punctuation may be added automatically, so don't include it
   #       leave the ones above as a default if none are configured.
   return $g[int rand rand int rand @g];
 }
+
 sub addnicktochannel {
   my ($nid, $ch, @n) = @_;
   $irc{$nid}{channel}{lc $ch}{nicks} = [ sort { $a cmp $b
@@ -444,6 +447,7 @@ sub addnicktochannel {
         network => $nid, channel => $channel, sender => $n[0]);
   }
 }
+
 sub removenickfromchannel {
   my ($nid, $ch, @n) = @_;
   my %remove = map { $_ => 1 } @n;
@@ -1151,7 +1155,7 @@ sub handlemessage {
         networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
   } elsif ($text =~ /^Xyzzy/i and (($howtorespond eq 'private') or (12 > rand(100)))) {
     my @msg = ("You are inside a building, a well house for a large spring.",
-               "You are in a debris room filled with stuff washed in from the surface."
+               "You are in a debris room filled with stuff washed in from the surface.",
                "Plugh",);
     say($msg[int rand @msg],
         networkid => $netid, channel => $howtorespond, sender => $sender );
@@ -1179,7 +1183,7 @@ sub handlemessage {
     say(debuginfo($1), networkid => $netid, channel => 'private', sender => $sender );
   } elsif ($text =~ /^!email\s+(\w+)\s*(\S.*?)\s*[:]\s*(.+)/) {
     my ($mnemonic, $subject, $restofmessage) = ($1, $2, $3);
-    my $contact = findrecord("emailcontact", ircnick   => $sender
+    my $contact = findrecord("emailcontact", ircnick   => $sender,
                                              networkid => $netid,
                                              mnemonic  => $mnemonic); # TODO: support nick aliases.
     if ($contact) {
@@ -1329,91 +1333,53 @@ sub handlemessage {
         logit("request is for message $msgnum", 4) if $debug{biff} > 2;
         my (@field) = split /\s+/, $therest;
         push @field, 'Subject' if not @field;
-        # TODO:  XXX YOU ARE HERE, putting $netid all over ze place.
-        for my $field (grep { $_ ne uc $_ } @field) { # mixed-case fields are header fields
-          for my $msg (biffhelper($popbox, $msgnum, [$field], 'suppresswatch', $sender, 'handlemessage (box-specific)')) {
-            say($msg, channel => 'private', sender => $sender);
+        for my $field (@field) { # in addition to header fields, biffhelper also supports
+                                 # several special fields: COUNT, SIZE, LINES, BODY
+          for my $msg (biffhelper($popbox, $msgnum, [$field], 'suppresswatch',
+                                  $netid, $sender, 'handlemessage (box-specific)')) {
+            say($msg, networkid => $netid, channel => 'private', sender => $sender);
             select undef,undef,undef,0.2;
-          }
-        } # TODO: make biffhelper support this stuff too, get rid of the grep, and simplify.
-        if (grep { $_ eq uc $_ } @field) {
-          # All-uppercase fields are magic.
-          warn "!biff (position 2): No sender means no ownernick" if not $sender;
-          my @pbr = findrecord('popbox',
-                               ownernick => $sender,
-                               (($popbox =~ /^\d+$/) ? 'id' : 'mnemonic') => $popbox, );
-          if (scalar @pbr) {
-            my @server = getrecord('popserver', $pbr[0]{server});
-            if (scalar @server) {
-              my $pop = new Mail::POP3Client( USER      => $pbr[0]{popuser},
-                                              PASSWORD  => $pbr[0]{poppass},
-                                              HOST      => $server[0]{serveraddress});
-              my $count = $pop->Count();
-              logit("POP3 Count: $count ($popbox => $pbr[0]{popuser} on $server[0]{serveraddress}) [A]") if $debug{pop3} > 1;
-              if (grep { $_ eq 'SIZE' } @field) {
-                my $body = $pop->Body($msgnum);
-                my $size = length($body);
-                say($size . " bytes", channel => 'private', sender => $sender );
-              } elsif (grep { /^(BODY|LINES)$/ } @field) {
-                my @line = $pop->Body($msgnum);
-                if (grep { $_ eq 'LINES' } @field) {
-                  say("" . @line . " lines", channel => 'private', sender => $sender );
-                }
-                if (grep { $_ eq 'BODY' } @field) {
-                  if ($irc{maxlines} >= scalar @line) {
-                    for my $l (@line) {
-                      chomp $l;
-                      say($l, channel => 'private', sender => $sender );
-                      select undef, undef, undef, (0.2 * scalar @line);
-                    }
-                  } else {
-                    say("Too many lines (" . @line . ")", channel => 'private', sender => $sender );
-                  }
-                }
-              }
-            } else {
-              say("Configuration error: no POP3 server for mailbox '$popbox'.",
-                  channel => 'private', sender => $sender );
-            }
-          } else {
-            say("Either I have no record of POP3 inbox '$popbox', or it does not belong to you, $sender.",
-                channel => 'private', sender => $sender );
           }
         }
       } else {
-        my $count   = biffhelper($popbox, undef, ['COUNT']) + 0;
-        say("$count messages waiting in $popbox", channel => 'private', sender => $sender, 'handlemessage (getting count)');
+        my $count = biffhelper($popbox, undef, ['COUNT'], 'suppresswatch',
+                               $netid, $sender, "handlemessage (getting count)") + 0;
+        say("$count messages waiting in $popbox",
+            networkid => $netid, channel => 'private', sender => $sender);
       }
-    } elsif ($irc{master}{$sender}) {
+    } elsif ($irc{$netid}{master}{$sender}) {
       # TODO: audit biff() to ensure they can only get their own mail,
       # then remove the master requirement here.
       logit("That's a general biff check request from $sender", 3) if $debug{biff} > 2;
-      biff($sender, 'saycount');
+      biff($netid, $sender, 'saycount');
     }
   } elsif ($text =~ /^!notification/) {
-    my @n = grep { $$_{usernick} eq $sender } findnull("notification", "dequeued");
+    my @n = grep { $$_{usernick} eq $sender
+                 } findnull("notification", "dequeued",
+                            ircnetworkid => $netid, );
     my $n = @n;
-    say(qq[$n notification(s) pending], channel => 'private', sender => $sender);
+    say(qq[$n notification(s) pending],
+        networkid => $netid, channel => 'private', sender => $sender);
   } elsif ($text =~ m~^!(backscroll|scrollback|context)\s*([#]+\S+)?\s*(\d*)\s*(HTML|/?msg)?~i) {
     my ($triggertext, $thechan, $linecount, $delivery) = ($1, $2, $3, $4);
     $thechan ||= $howtorespond;
     logit("Attempting request for backscroll for $thechan") if $debug{backscroll} > 1;
     logit("User asked for $linecount lines delivered via $delivery", 2) if $debug{backscroll} > 1;
     # (The intention here is to allow a person who just connected to get what they missed.)
-    my $limit = max(getconfigvar($cfgprofile, "backscroll$thechan"));
+    my $limit = max(getconfigvar($cfgprofile, $netid, "backscroll$thechan"));
     if ($limit > 0) {
       logit("Configuration allows up to $limit lines of backscroll for $thechan", 3) if $debug{backscroll};
       # TODO: if linecount is not specified, try to figure out what $sender missed.
       $linecount ||= $limit;
       $delivery  ||= getircuserpref($netid, $sender, "backscrolldelivery") || $prefdefault{backscrolldelivery} || '';
       logit("Want to do delivery via $delivery if possible", 3) if $debug{backscroll} > 2;
-      my $dirpath    = getconfigvar($cfgprofile, "pubdirpath");
-      my $diruri     = getconfigvar($cfgprofile, "pubdiruri");
+      my $dirpath    = getconfigvar($cfgprofile, undef, "pubdirpath");
+      my $diruri     = getconfigvar($cfgprofile, undef, "pubdiruri");
       if (not ($dirpath and $diruri)) {
         if ((lc $delivery) eq 'html') {
           logit("HTML delivery impossible for lack of pubdir", 3) if $debug{backscroll};
-          say("I'm afraid $irc{oper} has not set me up a publication directory yet, so I can't do HTML delivery.  Sorry.",
-              channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          say("I'm afraid $irc{$netid}{oper} has not set me up a publication directory yet, so I can't do HTML delivery.  Sorry.",
+              networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
           return;
         }
         $delivery = '/msg';
@@ -1422,16 +1388,18 @@ sub handlemessage {
       logit("Settled on delivery method: $delivery; want to do $linecount lines", 3) if $debug{backscroll} > 1;
       $linecount = $limit if $linecount > $limit;
       if ((lc $delivery) ne 'HTML') {
-        my $max    = getconfigvar($cfgprofile, "bsmaxlines") || $irc{maxlines};
+        my $max    = getconfigvar($cfgprofile, $netid, "bsmaxlines") || $irc{maxlines};
         $linecount = $max if $linecount > $max;
       }
       logit("Linecount limited to $linecount lines", 3) if $debug{backscroll} > 2;
-      my $ptr       = findrecord("config", cfgprofile => $cfgprofile, varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
+      my $ptr       = findrecord("config", cfgprofile => $cfgprofile, networkid => $netid,
+                                 varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
       my $displaytz = getircuserpref($netid, $sender, 'timezone') || $prefdefault{timezone} || $servertz;
       my @line;
+    # TODO:  XXX YOU ARE HERE, putting $netid all over ze place.
       for my $num (1 .. $linecount) {
         my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
-        my $r  = findrecord("backscroll", channel => $thechan, number => $i);
+        my $r  = findrecord("backscroll", networkid => $netid, channel => $thechan, number => $i);
         if (ref $r) {
           my $time    = friendlytime(DateTime::Format::MySQL->parse_datetime($$r{whensaid})->set_time_zone("UTC"), $displaytz, 'hms');
           my $speaker = encode_entities($$r{speaker});
@@ -1445,13 +1413,15 @@ sub handlemessage {
       logit(("Found " . @line . " lines of backscroll."), 3) if $debug{backscroll};
       if ((lc $delivery) eq 'html') {
         logit("Will try to publish an HTML backscroll record", 4) if $debug{backscroll} > 2;
-        my $fn  = "backscroll$thechan";
-        $fn =~ s/\W+/_/g;  $fn .= ".html";
+        my $netrec = getrecord("ircnetwork", $netid);
+        my $fn  = join "_",  "backscroll", $$netrec{networkname}, $thechan;
+        $fn =~ s/\W+/_/g; $fn =~ s/__/_/g; $fn .= ".html";
         logit("filename: $fn; timezone: $displaytz; pointer: $$ptr{value} (id$$ptr{id})", 4) if $debug{backscroll} > 4;
         my $filepath = catfile($dirpath, $fn);
         if (open HTML, ">", $filepath) {
           logit("Opened $filepath", 5) if $debug{backscroll} > 5;
-          print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan) . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
+          print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan . " on " . $netname)
+            . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
           for my $line (@line) {
             my ($time, $speaker, $message) = @$line;
             my $color   = ircnickcolor($speaker, $thechan, $sender);
@@ -1703,31 +1673,31 @@ sub ircnickcolor {
                        '#9966FF', '#7F00AA', '#CCAAFF', # Purple
                        '#CC33CC', '#7F007F', '#FF33FF', '#FFBBFF', # Magenta
                      );
-  if (not defined $irc{colorcache}) {
-    $irc{colorcache} = +{};
+  if (not defined $irc{__COLORCACHE__}) {
+    $irc{__COLORCACHE__} = +{};
     my @color = getconfigvar($cfgprofile, 'nickcolor');
     for my $special (qw(audience self operator master sibling)) {
       @color = @defaultcolor if not scalar @color;
-      $irc{colorcache}{$special} = shift @color;
+      $irc{__COLORCACHE__}{$special} = shift @color;
     }
     @color = @defaultcolor if not scalar @color;
-    $irc{colorcache}{other} = [ @color ];
+    $irc{__COLORCACHE__}{other} = [ @color ];
   }
 
-  if ($speaker eq $audience)  { return $irc{colorcache}{audience}; }
-  if ($speaker eq $irc{nick}) { return $irc{colorcache}{self};     }
-  if ($speaker eq $irc{oper}) { return $irc{colorcache}{operator}; }
-  if ($irc{master}{$speaker}) { return $irc{colorcache}{master};   }
-  if (grep { $_ eq $speaker } @{$irc{siblings}}) { return $irc{colorcache}{sibling}; }
+  if ($speaker eq $audience)  { return $irc{__COLORCACHE__}{audience}; }
+  if ($speaker eq $irc{nick}) { return $irc{__COLORCACHE__}{self};     }
+  if ($speaker eq $irc{oper}) { return $irc{__COLORCACHE__}{operator}; }
+  if ($irc{master}{$speaker}) { return $irc{__COLORCACHE__}{master};   }
+  if (grep { $_ eq $speaker } @{$irc{siblings}}) { return $irc{__COLORCACHE__}{sibling}; }
   $speaker =~ s/_//g;
   $speaker =~ s/[_0-9]+$//;
   $speaker = lc $speaker;
-  my $counter;
+  my $counter = length $speaker;
   foreach my $char (split //, $speaker) {
     $counter += ord $char;
   }
   logit("ircnickcolor($speaker, $context, $audience): color $counter") if $debug{backscroll} > 5;
-  return $irc{colorcache}{other}[$counter % (scalar @{$irc{colorcache}{other}})];
+  return $irc{__COLORCACHE__}{other}[$counter % (scalar @{$irc{__COLORCACHE__}{other}})];
 }
 
 sub haveseenlately {
@@ -1844,7 +1814,8 @@ sub periodicbiff { # TODO TODO TODO
 }
 
 sub biffhelper {
-  my ($popbox, $msgnum, $fields, $suppresswatch, $ownernick, $caller) = @_;
+  my ($popbox, $msgnum, $fields, $suppresswatch, $networkid, $ownernick, $caller) = @_;
+  warn "biffhelper: no networkid (from $caller)" if not $networkid;
   warn "biffhelper: no ownernick (from $caller)" if not $ownernick;
   my @answer;
   $fields ||= $msgnum ? ['Subject'] : ['COUNT'];
@@ -1941,16 +1912,25 @@ sub biffhelper {
 }
 
 sub biff {
-  my ($owner, $saycount) = @_;
+  my ($networkid, $owner, $saycount) = @_;
   my $total = 0;
-  logit("biff($owner, $saycount)", 4) if $debug{biff} > 2;
-  warn "biff(): no owner specified, defaulting to $irc{oper}" if not $owner;
-  $owner ||= $irc{oper};
+  logit("biff($networkid, $owner, $saycount)", 4) if $debug{biff} > 2;
+  if (not (0 + $networkid)) {
+    my ($networkid) = map { # Note: we just take the first one by default.
+      $$_{id}
+    } findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1);
+    die "No enabled IRC networks for this config profile ($cfgprofile)" if not $networkid;
+    warn "biff(): no numeric networkid specified; defaulting to $networkid";
+  }
+  warn "biff(): no owner specified, defaulting to $irc{$networkid}{oper}" if not $owner;
+  $owner ||= $irc{$networkid}{oper};
   warn "biff(): no owner/operator" and return if not $owner;
-  my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
+  my @confkey = map {
+    $$_{mnemonic}
+  } findrecord("popbox", ircnetworkid => $networkid, ownernick => $owner);
   for my $confkey (@confkey) {
     logit("Biff: checking POP3: $confkey", 2);
-    my $count = biffhelper($confkey, undef, undef, undef, $owner, 'biff') + 0;
+    my $count = biffhelper($confkey, undef, undef, undef, $networkid, $owner, 'biff') + 0;
     logit("Count for $confkey: $count") if $debug{biff} > 3;
     $total += $count;
     logit("Biff Count: $count ($confkey)") if $debug{pop3} > 1;
@@ -1958,7 +1938,7 @@ sub biff {
   if ($saycount) {
     logit("Biff count total for $owner: $total") if $debug{biff} > 4;
     say("Total of $total messages in " . @confkey . " POP3 account(s).",
-        channel => 'private', sender => $owner);
+        networkid => $networkid, channel => 'private', sender => $owner);
   }
 }
 
