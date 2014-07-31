@@ -36,6 +36,21 @@ if ($dbconfig{rdbms} eq 'mysql') {
 else {
   die "Unsupported/unknown/misspelled RDBMS: '$dbconfig{rdbms}'";
 }
+sub DateTime::Format::ForDB {
+  my ($dt) = @_;
+  if (ref $dt) {
+    $dt->set_time_zone("UTC");
+    return DateTime::Format::MySQL->format_datetime($dt);
+  }
+  carp "Vogon Folk Music: $dt, $@$!";
+}
+
+sub DateTime::Format::FromDB {
+  my ($string) = @_;
+  my $dt = DateTime::Format::MySQL->parse_datetime($string);
+  $dt->set_time_zone("UTC");
+  return $dt;
+}
 
 # Some database functions are not specific to any particular RDBMS
 # (because they call lower-level DB functions to do any RDBMS-specific
