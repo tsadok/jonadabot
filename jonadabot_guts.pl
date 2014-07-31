@@ -965,7 +965,7 @@ sub handlemessage {
     } elsif (@s) {
       my $s = $s[0];
       $answer = "/me last saw $$s{nick} in $$s{channel} "
-        . friendlytime(DateTime::Format::MySQL->parse_datetime($$s{whenseen}),
+        . friendlytime(DateTime::Format::MySQL->parse_datetime($$s{whenseen}->set_timezone($servertz)),
                        getircuserpref($sender, 'timezone')) . ".";
     }
     if (($howtorespond eq 'private') or ($irc{okdom}{$howtorespond})) {
