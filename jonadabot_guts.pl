@@ -1395,7 +1395,6 @@ sub handlemessage {
                                  varname => "bsi_$thechan", enabled => 1, ) || +{ value => 0 };
       my $displaytz = getircuserpref($netid, $sender, 'timezone') || $prefdefault{timezone} || $servertz;
       my @line;
-    # TODO:  XXX YOU ARE HERE, putting $netid all over ze place.
       for my $num (1 .. $linecount) {
         my $i  = ($limit + $$ptr{value} + $num - $linecount) % $limit;
         my $r  = findrecord("backscroll", networkid => $netid, channel => $thechan, number => $i);
@@ -1419,7 +1418,7 @@ sub handlemessage {
         my $filepath = catfile($dirpath, $fn);
         if (open HTML, ">", $filepath) {
           logit("Opened $filepath", 5) if $debug{backscroll} > 5;
-          print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan . " on " . $netname)
+          print HTML qq[<html><head>\n  <title>backscroll for ] . encode_entities($thechan . " on " . $$netrec{networkname})
             . qq[</title>\n  <link rel="stylesheet" type="text/css" media="screen" href="arsinoe.css" />\n</head><body>\n<table class="irc"><tbody>\n];
           for my $line (@line) {
             my ($time, $speaker, $message) = @$line;
@@ -1430,55 +1429,58 @@ sub handlemessage {
           print HTML qq[</tbody></table>\n</body></html>];
           close HTML;
           say(catfile($diruri, $fn),
-              channel => $howtorespond, fallbackto => 'private', sender => $sender);
+              networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
         } else {
           logit("Unable to open for write: $filepath");
           say("I couldn't seem to write out a backscroll record, sorry.",
-              channel => $howtorespond, fallbackto => 'private', sender => $sender);
+              networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
         }
       } else {
         logit("Doing backscroll delivery via /msg", 3) if $debug{backscroll};
         for my $line (@line) {
           my ($time, $speaker, $message) = @$line;
           say(qq[$time < $speaker > $message],
-              channel => 'private', sender => $sender);
+              networkid => $netid, channel => 'private', sender => $sender);
           select undef, undef, undef, 0.1;
         }
       }
     } else {
       say(qq[Backscroll is not enabled for channel $thechan  (Permission from channel ops is needed...)  Sorry.],
-          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     }
-  } elsif ($text =~ /^!shutdown/ and $irc{master}{$sender}) {
+  } elsif ($text =~ /^!shutdown/ and $irc{$netid}{master}{$sender}) {
     # TODO: implement this.  Just doing exit 0 does not work, because of AnyEvent.
     #  logit("Shutdown at the request of $sender", 1);
     # TODO: might also be good to implement a disconnect/reconnect,
     #       perhaps in conjunction with multi-irc-network support for version 007 or 008.
-  } elsif ($text =~ /^!nicklist/ and $irc{master}{sender}) {
-    my $nicks = join ' ', uniq(getconfigvar($cfgprofile, 'ircnick'), $defaultusername);
-    say($nicks, channel => $howtorespond, sender => $sender, fallbackto => private);
+  } elsif ($text =~ /^!nicklist/ and $irc{$netid}{master}{sender}) {
+    my $nicks = join ' ', uniq(getconfigvar($cfgprofile, $netid, 'ircnick'), $defaultusername);
+    say($nicks,
+        networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => private);
   } elsif ($text =~ /^!nick\s*(\w+)/) {
     my ($nick) = $1;
-    my %isnick = map { $_ => 1 } (getconfigvar($cfgprofile, 'ircnick'), $defaultusername);
-    if (($irc{master}{$sender} or getconfigvar($cfgprofile, 'allownicktrigger'))
+    my %isnick = map { $_ => 1 } (getconfigvar($cfgprofile, $netid, 'ircnick'), $defaultusername);
+    if (($irc{$netid}{master}{$sender} or getconfigvar($cfgprofile, $netid, 'allownicktrigger'))
         and $isnick{$nick}) {
       logit("/nick $nick at the request of $sender");
-      $irc->send_srv( NICK => $nick );
+      $irc{$netid}{client}->send_srv( NICK => $nick );
     }
-  } elsif ($text =~ /^!join ([#]+\w+(?:[-]\w+)*)/ and $irc{master}{$sender}) {
+  } elsif ($text =~ /^!group/i) {
+    logit("GROUP (network $netid) at request of $sender");
+  } elsif ($text =~ /^!join ([#]+\w+(?:[-]\w+)*)/ and $irc{$netid}{master}{$sender}) {
     my ($ch) = ($1);
-    logit("Attempting to /join $ch at the request of $sender");
-    $irc->send_srv( JOIN => $ch );
-    $irc{channel}{$ch} ||= +{};
-  } elsif ($text =~ /^!part ([#]+\w+(?:[-]\w+)*)/ and $irc{master}{$sender}) {
+    logit("Attempting to /join $ch at the request of $sender on network $netid");
+    $irc{$netid}{client}->send_srv( JOIN => $ch );
+    $irc{$netid}{channel}{$ch} ||= +{};
+  } elsif ($text =~ /^!part ([#]+\w+(?:[-]\w+)*)/ and $irc{$netid}{master}{$sender}) {
     my ($ch) = ($1);
-    logit("Attempting to /part $ch at the request of $sender");
-    $irc->send_srv( PART => $ch );
-    delete $irc{channel}{$ch};
-  } elsif ($text =~ /^!reload/ and $irc{master}{$sender}) {
+    logit("Attempting to /part $ch at the request of $sender on network $netid");
+    $irc{$netid}{client}->send_srv( PART => $ch );
+    delete $irc{$netid}{channel}{$ch};
+  } elsif ($text =~ /^!reload/ and $irc{$netid}{master}{$sender}) {
     $|=1;
     if ($text =~ /^!reload full/i) {
-      logit("FULL reload at the request of $sender", 1);
+      logit("FULL reload at the request of $sender on network $netid", 1);
       # This only works in the intended fashion when the bot is running inside a
       # run-on-exit loop, such as the provided jonadabot-keeprunning.sh
       system("kill", $$);
@@ -1488,30 +1490,31 @@ sub handlemessage {
       delete $irc{situationalregex};
       do $regexen;
       say("Regular expressions reloaded; situational regexes flushed.",
-          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload (?:extra)?\s*(?:sub|routine)/) {
       logit("Reloading extrasubs at the request of $sender: $extrasubs");
       do $extrasubs;
-      say("Custom routines (extrasubs) reloaded.", channel => $howtorespond, fallbackto => 'private', sender => $sender);
+      say("Custom routines (extrasubs) reloaded.",
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload (?:pref|default)/) {
       logit("Reloading pref defaults at the request of $sender");
       loadprefdefaults();
       say("Pref defaults reloaded.",
-          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload config/) {
       logit("Reloading config at the request of $sender");
       loadconfig();
       say("Basic configuration reloaded.",
-          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload debug/) {
       logit("Reloading debug levels at the request of $sender");
       loaddebuglevels();
       say("Debug levels reloaded.",
-          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } elsif ($text =~ /^!reload pipes/) {
       # TODO:
       say("Re-initializing file watch pipes is an intended feature but has not yet been implemented, sorry.",
-          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+          networkid => $netid, channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } else { # TODO: re-test how well this works in 006, and clean up any non-working bits.
       logit("Reloading multiple components at the request of $sender", 1);
       do $dbcode;
@@ -1529,10 +1532,12 @@ sub handlemessage {
                                                } findrecord("bottrigger", "bottrigger", $1, "enabled", 1))) {
     logit("Can't Happen: no bottrigger record for $text") if not @rec;
     for my $t (@rec) {
-      if ((not $$t{channel}) or (index($$t{channel}, $howtorespond) > 0) or ($howtorespond eq 'private')) {
-        if (($irc{okdom}{$howtorespond}) or (not ($$t{flags} =~ /C/))
+      if ((((not $$t{channel}) or (index($$t{channel}, $howtorespond) > 0)) and
+           ((not $$t{networkid}) or ($$t{networkid} eq $netid)))
+          or ($howtorespond eq 'private')) {
+        if (($irc{$netid}{okdom}{$howtorespond}) or (not ($$t{flags} =~ /C/))
             or ($howtorespond eq 'private')) { # C means respond in channel even if not okdom
-          if ($irc{master}{$sender} or not $$t{flags} =~ /M/) { # M means master-only bottrigger
+          if ($irc{$netid}{master}{$sender} or not $$t{flags} =~ /M/) { # M means master-only bottrigger
             if ($$t{flags} =~ /P/) { # P means Proxied bottrigger, i.e., we ask another bot.
               # Note that the other bot must trigger on a /msg and respond in kind.  If
               # the command has to be given in a channel, we don't want to respond to it
@@ -1542,10 +1547,11 @@ sub handlemessage {
               # good, of course:  we shouldn't be proxying for a bot that frequents the
               # same channel we're in; if we are it means we're misconfigured.  But only
               # using /msg to get the response should at least avoid loops, so we do that:
-              say($text, channel => 'private', sender => $$t{answer});
-              $irc{echo}{$$t{answer}}{private}{count}++;
-              $irc{echo}{$$t{answer}}{private}{channels} = [ uniq($howtorespond, @{$irc{echo}{$$t{answer}}{private}{channels}}) ];
-              push @{$irc{echo}{$$t{answer}}{private}{fallback}}, $sender;
+              say($text, networkid => $netid, channel => 'private', sender => $$t{answer});
+              $irc{$netid}{echo}{$$t{answer}}{private}{count}++;
+              $irc{$netid}{echo}{$$t{answer}}{private}{channels}
+                = [ uniq($howtorespond, @{$irc{$netid}{echo}{$$t{answer}}{private}{channels}}) ];
+              push @{$irc{$netid}{echo}{$$t{answer}}{private}{fallback}}, $sender;
               # The above isn't perfect.  In the event of lag, when multiple destination
               # channels are involved, responses to multiple proxied commands can end up
               # all being echoed to channels that only some of them were supposed to be
@@ -1555,31 +1561,42 @@ sub handlemessage {
               # rather noticeably or becomes entirely unreachable (e.g., netsplit).
             } elsif ($$t{flags} =~ /R/) { # R means Routine bottrigger, as opposed to flat text
               if ($routine{$$t{answer}}) {
-                my $response = $routine{$$t{answer}}->($$t{bottrigger}, channel => $howtorespond, text => $text, sender => $sender);
+                my $response = $routine{$$t{answer}}->($$t{bottrigger},
+                                                       networkid => $netid,
+                                                       channel   => $howtorespond,
+                                                       text      => $text,
+                                                       sender    => $sender);
                 # TODO: pass more args there to allow routines more flexibility in what they can do.
                 if ($response) {
-                  say($response, channel => $howtorespond, sender => $sender, fallbackto => 'private')
+                  say($response,
+                      networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private')
                 } else {
-                  logit("No response from routine $$t{answer} for bottrigger $$t{bottrigger}"); # always log this; it's an error
+                  logit("No response from routine $$t{answer} for bottrigger $$t{bottrigger}"
+                        . " (channel $howtorespond, network $netid)"); # always log this; it's an error
                 }
               } else {
-                logit("Did not find routine $$t{answer} for bottrigger $$t{bottrigger}"); # always log this; it's an error
+                logit("Did not find routine $$t{answer} for bottrigger $$t{bottrigger}"
+                     . " (channel $howtorespond, network $netid)"); # always log this; it's an error
               }
             } else {
               # Flat, non-routine bottrigger
-              say($$t{answer}, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+              say($$t{answer}, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
             }
           } else {
-            logit("Not responding to master-only custom bottrigger in channel $howtorespond for sender $sender") if $debug{bottrigger};
+            logit("Not responding to master-only custom bottrigger in channel $howtorespond"
+                  . " for sender $sender on network $netid") if $debug{bottrigger};
           }
         } else {
-          logit("Not responding to custom bottrigger $$t{bottrigger} in non-okdom channel $howtorespond") if $debug{bottrigger};
+          logit("Not responding to custom bottrigger $$t{bottrigger} in non-okdom channel $howtorespond"
+                . " on network $netid") if $debug{bottrigger};
         }
       } else {
-        logit("Not responding to custom bottrigger $$t{bottrigger} in non-included channel $howtorespond") if $debug{bottrigger};
+        logit("Not responding to custom bottrigger $$t{bottrigger}"
+              . " in non-included channel $howtorespond on network $netid") if $debug{bottrigger};
       }
     }
-  } elsif (ref $irc{situationalregex}{$howtorespond}) {
+# TODO:  XXX YOU ARE HERE, putting $netid all over ze place.
+  } elsif (ref $irc{situationalregex}{$netid}{$howtorespond}) {
     # These can be set (and later disabled again) by custom routines
     # (e.g. bottrigger handlers), to enable context-sensitive
     # responses to certain words and phrases.  For an example,
