@@ -681,9 +681,9 @@ sub debuginfo {
       my $ch = $_;
       "$ch:" . "[" . (join ", ",
                       grep {
-                        $irc{situationalregex}{$ch}{enabled};
-                      } keys %{$irc{situationalregex}{$ch}}) . "]";
-    } keys %{$irc{situationalregex}};
+                        $irc{situationalregex}{$netid}{$ch}{enabled};
+                      } keys %{$irc{situationalregex}{$netid}{$ch}}) . "]";
+    } keys %{$irc{situationalregex}{$netid}};
   }
   return "I know nothing, nothing.";
 }
@@ -1602,15 +1602,15 @@ sub handlemessage {
     # responses to certain words and phrases.  For an example,
     # see the hangman routine in jonadabot_extrasubs_sample.pl
     logit("Checking situational regexes") if $debug{sitregex} > 1;
-    foreach my $k (keys %{$irc{situationalregex}{$howtorespond}}) {
-      logit("$k: e$irc{situationalregex}{$howtorespond}{$k}{enabled}, r$irc{situationalregex}{$howtorespond}{$k}{regex}")
+    foreach my $k (keys %{$irc{situationalregex}{$netid}{$howtorespond}}) {
+      logit("$k: e$irc{situationalregex}{$netid}{$howtorespond}{$k}{enabled}, r$irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}")
         if $debug{sitregex} > 3;
-      if ($irc{situationalregex}{$howtorespond}{$k}{enabled} and
-          (defined $irc{situationalregex}{$howtorespond}{$k}{regex}) and
-          (ref $irc{situationalregex}{$howtorespond}{$k}{callback})) {
+      if ($irc{situationalregex}{$netid}{$howtorespond}{$k}{enabled} and
+          (defined $irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}) and
+          (ref $irc{situationalregex}{$netid}{$howtorespond}{$k}{callback})) {
         logit("Checking situational regex: $k",3) if $debug{sitregex} > 2;
-        if ($text =~ $irc{situationalregex}{$howtorespond}{$k}{regex}) {
-          $irc{situationalregex}{$howtorespond}{$k}{callback}->($k, $text,
+        if ($text =~ $irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}) {
+          $irc{situationalregex}{$netid}{$howtorespond}{$k}{callback}->($k, $text,
                                                                 channel => $howtorespond,
                                                                 sender  => $sender,
                                                                );
