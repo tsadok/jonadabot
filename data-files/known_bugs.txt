@@ -35,6 +35,10 @@ Features Wanted:
  * Add a timer to check whether we have our preferred (first)
    nick, and if not periodically try to get it.   Use
    $irc->nick() and/or $irc->is_my_nick() for this.
+ * Use server pings, at least optionally, instead of or on
+   a different (potentially much shorter) interval than botpings.
+   Set via $irc->enable_ping($interval, $callback);
+ * Use $irc->is_channel_name were appropriate, as a sanity check.
  * Add a watch regex for demogorgon's "killed the ghost of"
      that only does anything if the ghost is from your clan.
  * Play a scrambled word game.
