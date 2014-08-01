@@ -33,6 +33,13 @@ Features Wanted:
  * In okdom channels, answer things like "hi" or "hello"
      with a configurable channel-specific message (if set)
      or a semi-random generic greeting (otherwise).
+ * Use $irc->set_nick_change_cb() to set a callback in case
+   we get stuck by ournick_ or what have you, to try successive
+   other nicks on our list.  This needs to store state so it
+   can try each of them in turn.
+ * Add a timer to check whether we have our preferred (first)
+   nick, and if not periodically try to get it.   Use
+   $irc->nick() and/or $irc->is_my_nick() for this.
  * Add a watch regex for demogorgon's "killed the ghost of"
      that only does anything if the ghost is from your clan.
  * Play a scrambled word game.
