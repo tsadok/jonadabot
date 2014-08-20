@@ -16,6 +16,8 @@ Known bugs:
    due to SQL differences between database implementations.  A test
    suite should be developed that exercises all the DB functions
    so that these issues can be discovered and fixed.
+ * There's still one timezone bug: when UTC is shown in addition to
+   a user's timezone, it is calculated incorrectly.
 
 Features Wanted:
  * TODO-list management:
