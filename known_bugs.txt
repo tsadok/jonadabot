@@ -12,6 +12,8 @@ Known bugs:
    probably not working right.  Also, I want to add the ability to
    re-initialize all the filewatch pipes, both on-demand and also on a
    schedule (because of things like logrotate).
+ * There's still one timezone bug: when UTC is shown in addition to
+   a user's timezone, it is calculated incorrectly.
 
 Features Wanted:
  * TODO-list management:
