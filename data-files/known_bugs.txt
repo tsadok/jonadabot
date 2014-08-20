@@ -1,4 +1,7 @@
 Known bugs:
+ * Periodic biff (on a timer) has not yet been implemented
+   for the multinetwork branch.  There's a stub routine,
+   periodicbiff(), but it doesn't currently do anything.
  * When setting an alarm, the date is not optional.  You have to
    at least say "today", which is annoying.
  * When setting an alarm for a future date and checking via !alarms,

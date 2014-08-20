@@ -1595,7 +1595,6 @@ sub handlemessage {
               . " in non-included channel $howtorespond on network $netid") if $debug{bottrigger};
       }
     }
-# TODO:  XXX YOU ARE HERE, putting $netid all over ze place.
   } elsif (ref $irc{situationalregex}{$netid}{$howtorespond}) {
     # These can be set (and later disabled again) by custom routines
     # (e.g. bottrigger handlers), to enable context-sensitive
@@ -1603,7 +1602,8 @@ sub handlemessage {
     # see the hangman routine in jonadabot_extrasubs_sample.pl
     logit("Checking situational regexes") if $debug{sitregex} > 1;
     foreach my $k (keys %{$irc{situationalregex}{$netid}{$howtorespond}}) {
-      logit("$k: e$irc{situationalregex}{$netid}{$howtorespond}{$k}{enabled}, r$irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}")
+      logit("$k: e$irc{situationalregex}{$netid}{$howtorespond}{$k}{enabled},"
+            . " r$irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}")
         if $debug{sitregex} > 3;
       if ($irc{situationalregex}{$netid}{$howtorespond}{$k}{enabled} and
           (defined $irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}) and
@@ -1611,44 +1611,46 @@ sub handlemessage {
         logit("Checking situational regex: $k",3) if $debug{sitregex} > 2;
         if ($text =~ $irc{situationalregex}{$netid}{$howtorespond}{$k}{regex}) {
           $irc{situationalregex}{$netid}{$howtorespond}{$k}{callback}->($k, $text,
-                                                                channel => $howtorespond,
-                                                                sender  => $sender,
-                                                               );
+                                                                        channel => $howtorespond,
+                                                                        sender  => $sender,
+                                                                       );
         }
       } else {
         logit("Situational regex disabled: $k") if $debug{sitregex} > 3;
       }
     }
-  } elsif ($irc{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots.
+  } elsif ($irc{$netid}{echo}{$sender}{$howtorespond}{count}) { # Answers from triggers that we proxied to other bots.
     # Note that $howtorespond SHOULD always be private for these, because that's the only way we proxy them.
-    my $fallback = shift @{$irc{echo}{$sender}{$howtorespond}{fallback}};
-    for my $chan (@{$irc{echo}{$sender}{$howtorespond}{channels}}) {
-      say(qq[$sender says: $text], channel => $chan, sender => $fallback, fallbackto => 'private');
+    my $fallback = shift @{$irc{$netid}{echo}{$sender}{$howtorespond}{fallback}};
+    for my $chan (@{$irc{$netid}{echo}{$sender}{$howtorespond}{channels}}) {
+      say(qq[$sender says: $text],
+          networkid => $netid, channel => $chan, sender => $fallback, fallbackto => 'private');
     }
     # TODO: because of the imperfections mentioned above (where these variables are set),
     # there really should be a trigger that clears these variables out on request, so
     # that our bot doesn't have to be restarted just because e.g. Rodney has been offline.
-    $irc{echo}{$sender}{$howtorespond}{count}--;
-    if ($irc{echo}{$sender}{$howtorespond}{count} <= 0) {
-      $irc{echo}{$sender}{$howtorespond}{count} = 0;
-      $irc{echo}{$sender}{$howtorespond}{channels} = [];
-      $irc{echo}{$sender}{$howtorespond}{fallback} = [];
+    $irc{$netid}{echo}{$sender}{$howtorespond}{count}--;
+    if ($irc{$netid}{echo}{$sender}{$howtorespond}{count} <= 0) {
+      $irc{$netid}{echo}{$sender}{$howtorespond}{count} = 0;
+      $irc{$netid}{echo}{$sender}{$howtorespond}{channels} = [];
+      $irc{$netid}{echo}{$sender}{$howtorespond}{fallback} = [];
     }
   }
   # Finally, check to see if we have any memoranda for the person who just spoke:
-  my @msg = grep { not $$_{status} } findrecord('memorandum', 'target', $sender);
+  my @msg = grep { not $$_{status}
+                 } findrecord('memorandum', networkid => $netid, target => $sender);
   # TODO: support nick aliases
   if (scalar @msg) {
     if (2 < scalar @msg) {
       my $nums = commalist(map { $$_{id} } @msg);
       say("$sender, I have " . @msg . " new messages for you (numbers $nums).  Use !message [number] to view them.",
-          channel => $howtorespond, sender => $sender, fallbackto => 'private');
+          networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
     } else {
       for my $num (map { $$_{id} } @msg) {
-        viewmessage(number => $num, networkid => __NETWORK_ID__, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+        viewmessage(number => $num, networkid => $netid, channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }
     }
-  } elsif ($sender and $irc{master}{$sender}) {
+  } elsif ($sender and $irc{$netid}{master}{$sender}) {
     processnotification(); # Only doing this when a master speaks
                            # prevents it from going off on all the
                            # server notices when we first start up.
@@ -1656,8 +1658,8 @@ sub handlemessage {
     # although they wouldn't strictly have to be; note that, if no master
     # speaks, notifications still happen on a timer.
   } else {
-    # Don't do anything here that takes a lot of time.  It would cause really slow startup
-    # as all the server notices are processed.
+    # Don't do anything here that takes a lot of time.  It would cause
+    # really slow startup as all the server notices are processed.
   }
 }
 
@@ -1719,7 +1721,7 @@ sub ircnickcolor {
 sub haveseenlately {
   my ($netid, $nick) = @_;
   # Check to see if we've seen that user "lately".
-  my ($latelynum, $latelyunit) = (("" . getconfigvar($cfgprofile, 'lately')) || "72 hours")
+  my ($latelynum, $latelyunit) = (("" . getconfigvar($cfgprofile, $netid, 'lately')) || "72 hours")
     =~ /([0-9.]+)\s*(second|minute|hour|day|week|month|year)/; # We stop short of the "s" here, add it below, so it's optional.
   $latelyunit ||= 'minute';
   my $lately = DateTime::Format::ForDB(DateTime->now(@tz)->add( ($latelyunit . "s") => $latelynum ));
@@ -1740,12 +1742,13 @@ sub viewmessage {
     $$r{status} = 2;
     $$r{statusdate} = DateTime::Format::ForDB(DateTime->now(@tz));
     updaterecord('memorandum', $r);
-  } elsif ($$r{target} eq $arg{sender}) { # TODO: support cross-network aliases
+  } elsif (($$r{target} eq $arg{sender}) and
+           ($$r{networkid} eq $arg{networkid})) { # TODO: support cross-network aliases
     my $network = getrecord("ircnetwork", $$r{networkid});
     if (ref $network) {
       say("$sender, that message is for delivery on $$network{networkname}", %arg);
     } else {
-      logit("ERROR: not network record for network $$network{id}, referenced in memorandum $arg{number}");
+      logit("ERROR: no network record for network $$r{networkid}, referenced in memorandum $arg{number}");
     }
   } else {
     say("$sender, that message is for $$r{target}.", %arg);
@@ -1827,33 +1830,44 @@ sub periodicbiff { # TODO TODO TODO
   logit("TODO: need to implement periodic biff");
   # This should check all active/enabled accounts and
   # NOT assume they all belong to the bot operator.
+  for my $ircnetwork (getrecord("ircnetwork")) {
+    biffhelper(undef, undef, [], undef, $$ircnetwork{id}, undef, 'periodicbiff');
+  }
 }
 
 sub biffhelper {
   my ($popbox, $msgnum, $fields, $suppresswatch, $networkid, $ownernick, $caller) = @_;
   warn "biffhelper: no networkid (from $caller)" if not $networkid;
   warn "biffhelper: no ownernick (from $caller)" if not $ownernick;
-  my @answer;
+  my (@answer);
   $fields ||= $msgnum ? ['Subject'] : ['COUNT'];
   for my $field (@$fields) {
-    my @pbr = findrecord('popbox', (($popbox =~ /^\d+$/) ? 'id' : 'mnemonic') => $popbox );
-    @pbr = grep { $$_{ownernick} eq $ownernick } @pbr if $ownernick;
-    if (scalar @pbr) {
-      my @server = getrecord('popserver', $pbr[0]{server});
+    my @pbr;
+    if ($popbox) {
+      logit("biffhelper(): looking for '$field' in popbox '$popbox'") if $debug{biff} > 1;
+      @pbr = findrecord('popbox', (($popbox =~ /^\d+$/) ? 'id' : 'mnemonic') => $popbox );
+    } elsif ($networkid) { # Periodic biff uses this code path.
+      logit("biffhelper(): looking for '$field' in any POP3 mailbox.") if $debug{biff} > 1;
+      @pbr = findrecord('popbox', ircnetworkid => $networkid);
+    }
+    @pbr = grep { ($$_{ownernick} eq $ownernick) and ($$_{ircnetworkid} eq $networkid) } @pbr if $ownernick;
+    for my $pbr (@pbr) {
+      my @server = getrecord('popserver', $$pbr{server});
       if (scalar @server) {
         my @bwargs;
-        my $pop = new Mail::POP3Client( USER     => $pbr[0]{popuser},
-                                        PASSWORD => $pbr[0]{poppass},
+        my $pop = new Mail::POP3Client( USER     => $$pbr{popuser},
+                                        PASSWORD => $$pbr{poppass},
                                         HOST     => $server[0]{serveraddress});
-        my $oldcount = $pbr[0]{count} || 0;
+        my $oldcount = $$pbr{count} || 0;
         my $count = $pop->Count();
-        logit("POP3 Count: $count ($popbox => $pbr[0]{popuser} on $server[0]{serveraddress}) [BH]") if $debug{pop3} > 1;
+        logit("POP3 Count: $count ($popbox => $$pbr{popuser} on $server[0]{serveraddress}) [BH]") if $debug{pop3} > 1;
         if ($field eq 'COUNT') {
           push @answer, $count . " [in $popbox]";
         } elsif ($field eq 'SIZE') {
           my $body = $pop->Body($msgnum);
           my $size = length($body);
           $answer = $size . " bytes";
+          push @answer, $answer;
         } elsif ($field =~ /^(LINES|BODY)$/) { # TODO
           my @line = $pop->Body($msgnum);
           if ($field eq 'LINES') {
@@ -1892,20 +1906,20 @@ sub biffhelper {
           } elsif ($count <= $oldcount) {
             logit("biffhelper: user must have got their mail ($popbox)", 4) if $debug{biff} >= 4;
             logit("[count: $count; already know about $oldcount].", 5) if $debug{biff} >= 5;
-            $pbr[0]{count} = $count;
-            updaterecord('popbox', $pbr[0]);
+            $$pbr{count} = $count;
+            updaterecord('popbox', $pbr);
           } elsif ($count > $oldcount) {
             my $n = $count - $oldcount;
             logit("biffhelper: need to watch $n messages ($popbox)", 4) if $debug{biff} >= 4;
             for my $i (($oldcount + 1) .. $count) {
               my @h = $pop->Head($i);
               logit("biffhelper: found " . @h . " headers to watch", 5) if $debug{biff} >= 5;
-              for my $w (map { $$_{watchkey}} findrecord('popwatch', 'popbox', $pbr[0]{id})) {
-                push @bwargs, [$popbox, $w, [@h], $i, $pbr[0]{ownernick}];
+              for my $w (map { $$_{watchkey}} findrecord('popwatch', 'popbox', $$pbr{id})) {
+                push @bwargs, [$popbox, $w, [@h], $i, $$pbr{ownernick}, $$pbr{ircnetworkid}, $pbr];
               }
-              $pbr[0]{count}++;
+              $$pbr{count}++;
             }
-            updaterecord('popbox', $pbr[0]);
+            updaterecord('popbox', $pbr);
           }}
         $pop->close(); # necessary because POP3 servers don't necessarily allow simultaneous connections.
         # TODO: don't close; instead pass the $pop object to biffwatch() and re-use it; that would be more robust anyway.
@@ -1927,7 +1941,8 @@ sub biffhelper {
   }
 }
 
-sub biff {
+sub biff { # This is only called when a user asks for !biff.
+           # When it happens on a timer, that's periodicbiff() instead.
   my ($networkid, $owner, $saycount) = @_;
   my $total = 0;
   logit("biff($networkid, $owner, $saycount)", 4) if $debug{biff} > 2;
@@ -1958,11 +1973,12 @@ sub biff {
   }
 }
 
-sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
-  # TODO:  allow the same bot to watch mail for and notify multiple users.
-  my ($ckey, $category, $headers, $popnum, $usernick) = @_;
+# TODO:  XXX YOU ARE HERE, putting networkid all over ze place.
+
+sub biffwatch {
+  my ($ckey, $category, $headers, $popnum, $usernick, $netid, $pbr) = @_;
   my $n = scalar @$headers;
-  logit("biffwatch($ckey, $category, [$n], $popnum, $usernick)", 5) if $debug{biff} >= 4;
+  logit("biffwatch($ckey, $category, [$n], $popnum, $usernick, $netid, $$pbr{id})", 5) if $debug{biff} >= 4;
   if ($watchregex{$category}) {
     for my $sc (@{$watchregex{$category}}) {
       my ($subcat, $regex, $action, $fields, $callback) = @$sc;
@@ -1970,89 +1986,120 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
       my @match = grep { $_ =~ $regex;
                        } @$headers;
       if (scalar @match) {
-        my $detail = join " / ", map { $_ =~ $regex; $1; } @match;
+        my $detail = join " / ", map { $_ =~ $regex; grep { $_ } ($1, $2, $3, $4, $5, $6, $7, $8, $9); } @match;
         my $scname = ($subcat eq $category) ? $subcat : "$category / $subcat";
         logit("biffwatch: matched $scname ($detail)", 6) if $debug{biff} >= 4;
-        if ($action eq 'notify') {
-          logit("calling biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick)", 6) if $debug{biff} > 5;
-          biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick);
-        } elsif ($action eq 'readsubject') {
-          logit("reading subject to $irc{oper}", 6) if $debug{biff} > 5;
-          my @subj = grep { /^Subject[:]/ } @$headers;
-          if ($irc{maxlines} < scalar @subj) {
-            my $nmore = 0;
-            while ($irc{maxlines} <= scalar @subj) { pop @subj; $nmore++; }
-            push @subj, "($nmore additional Subject lines not shown.)";
-          }
-          say($_ . qq{ [$ckey:$popnum]},  channel => 'private', sender => $irc{oper}) for @subj;
-        } elsif ($action eq 'readbody') {
-          logit("reading body to $irc{oper}", 6) if $debug{biff} > 5;
-          say("New $scname message [$detail] ($ckey:$popnum):", channel => 'private', sender => $irc{oper} );
-          biffnotify($ckey, $category, $detail, $headers, $popnum);
-          my $box = findrecord('popbox', 'mnemonic', $ckey);
-          my $srv = getrecord('popserver', $$box{server});
-          my $pop = new Mail::POP3Client( USER      => $$box{popuser},
-                                          PASSWORD  => $$box{poppass},
-                                          HOST      => $$srv{serveraddress});
-          if (ref $pop) {
-            if ($pop->Connect() >= 0) {
-              my $count = $pop->Count();
-              logit("POP3 Count: $count ($ckey => $$conf{user} on $$conf{server})") if $debug{pop3} > 1;
-              my @retr; # Just in case.
-              my @head = $pop->Head($popnum);
-              if (not @head) {
-                say("POP3 Server is Apparently Retarded ($ckey)", channel => 'private', sender => $irc{oper});
-                @retr = $pop->Retrieve($popnum);
-                say("Retrieved " . @retr . " lines total", channel => 'private', sender => $irc{oper});
-                my $l = shift @retr; chomp $l;
-                while (not $l =~ /^$/) {
-                  push @head, $l;
-                  $l = shift @retr;
+        if ($netid) {
+          if ($action eq 'notify') {
+            logit("calling biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick, $netid)", 6) if $debug{biff} > 5;
+            biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick, $netid);
+          } elsif ($action eq 'readsubject') {
+            my $target = $usernick || $irc{$netid}{oper};
+            logit("reading subject to $target on network $netid", 6) if $debug{biff} > 5;
+            my @subj = grep { /^Subject[:]/ } @$headers;
+            if ($irc{maxlines} < scalar @subj) {
+              my $nmore = 0;
+              while ($irc{maxlines} <= scalar @subj) { pop @subj; $nmore++; }
+              push @subj, "($nmore additional Subject lines not shown.)";
+            }
+            say($_ . qq{ [$ckey:$popnum]},
+                networkid => $netid, channel => 'private', sender => $target) for @subj;
+          } elsif ($action eq 'readbody') {
+            my $target = $usernick || $irc{$netid}{oper};
+            logit("reading body to $target", 6) if $debug{biff} > 5;
+            say("New $scname message [$detail] ($ckey:$popnum):",
+                networkid => $netid, channel => 'private', sender => $target );
+            biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick, $netid);
+            my $box = $pbr || findrecord('popbox', mnemonic     => $ckey,
+                                                   ircnetworkid => $netid,
+                                                   ownernick    => $target )
+                           || findrecord("popbox", mnemonic     => $ckey, );
+            # TODO: redo the indentation on the following code.
+            if (ref $box) {
+            my $srv = getrecord('popserver', $$box{server});
+            if (ref $srv) {
+              my $pop = new Mail::POP3Client( USER      => $$box{popuser},
+                                              PASSWORD  => $$box{poppass},
+                                              HOST      => $$srv{serveraddress});
+            if (ref $pop) {
+              if ($pop->Connect() >= 0) {
+                my $count = $pop->Count();
+                logit("POP3 Count: $count ($ckey => $$conf{user} on $$conf{server})") if $debug{pop3} > 1;
+                my @retr; # Just in case.
+                my @head = $pop->Head($popnum);
+                if (not @head) {
+                  logit("POP3 Server is Apparently Retarded ($ckey), $netid, $target") if $debug{pop3};
+                  @retr = $pop->Retrieve($popnum);
+                  say("Retrieved " . @retr . " lines total",
+                      networkid => $netid, channel => 'private', sender => $target);
+                  my $l = shift @retr; chomp $l;
+                  while (not $l =~ /^$/) {
+                    push @head, $l;
+                    $l = shift @retr;
+                  }
                 }
-              }
-              my @subj = grep { /Subject[:]/ } @head;
-              if ($irc{maxlines} > scalar @subj) {
-                if (scalar @subj) {
-                  for my $l (@subj) {
-                    chomp $l;
-                    say($l, channel => 'private', sender => $irc{oper} );
-                    select undef, undef, undef, (0.1 * scalar @line);
+                my @subj = grep { /Subject[:]/ } @head;
+                if ($irc{maxlines} > scalar @subj) {
+                  if (scalar @subj) {
+                    for my $l (@subj) {
+                      chomp $l;
+                      say($l, networkid => $netid, channel => 'private', sender => $target );
+                      select undef, undef, undef, (0.1 * scalar @line);
+                    }
+                  } else {
+                    say("No Subject: header found (out of " . @head . " header lines total)",
+                        networkid => $netid, channel => 'private', sender => $target);
                   }
                 } else {
-                  say("No Subject: header found (out of " . @head . " header lines total)",
-                      channel => 'private', sender => $irc{oper});
+                  # This would be a seriously malformed email message.
+                  # I only check for it 'cause I'm paranoid.
+                  say("Too many subject lines (" . @subj . ")",
+                      networkid => $netid, channel => 'private', sender => $target );
                 }
-              } else {
-                say("Too many subject lines (" . @subj . ")", channel => 'private', sender => $irc{oper} );
-              }
-              my @line = $pop->Body($popnum);
-              if (not scalar @line) {
-                # more retarded POP3 server stuff
-                push @line, $_ for @retr;
-              }
-              if ($irc{maxlines} >= scalar @line) {
-                if (@line) {
-                  for my $l (@line) {
-                    chomp $l;
-                    say($l, channel => 'private', sender => $irc{oper} );
-                    select undef, undef, undef, (0.1 * scalar @line);
+                my @line = $pop->Body($popnum);
+                if (not scalar @line) {
+                  # more retarded POP3 server stuff
+                  push @line, $_ for @retr;
+                }
+                if ($irc{maxlines} >= scalar @line) {
+                  if (@line) {
+                    for my $l (@line) {
+                      chomp $l;
+                      say($l, networkid => $netid, channel => 'private', sender => $target );
+                      select undef, undef, undef, (0.1 * scalar @line);
+                    }
+                  } else {
+                    say("[The body of the message is empty.]",
+                        networkid => $netid, channel => 'private', sender => target );
                   }
                 } else {
-                  say("[The body of the message is empty.]", channel => 'private', sender => $irc{oper} );
+                  say("Message body is too long to read here.",
+                      networkid => $netid, channel => 'private', sender => $target );
                 }
               } else {
-                say("Message body is too long to read here.", channel => 'private', sender => $irc{oper} );
+                say("POP3: failed to connect to server ($ckey)",
+                    networkid => $netid, channel => 'private', sender => $target );
               }
             } else {
-              say("POP3: failed to connect to server ($ckey)", channel => 'private', sender => $irc{oper} );
+              say("Mail::POP3Client constructor failed ($ckey)",
+                  networkid => $netid, channel =>'private', sender => $target);
+            }
+            } else {
+              say("No server record for popbox $$box{id}",
+                  networkid => $netid, channel => 'private', sender => $target );
             }
           } else {
-            say("Mail::POP3Client constructor failed ($ckey)", channel =>'private', sender => $irc{oper});
+            say("No POP box record (readbody: $ckey, $netid, $target, $usernick)",
+                  networkid => $netid, channel => 'private', sender => $target );
           }
-        } # TODO: other actions can be implemented here, e.g. calling a callback to parse a substring out of the body.
+          } # TODO: other actions can be implemented here, e.g. calling a callback to parse a substring out of the body.
           else {
-          logit("biffwatch: unknown action, $action; defaulting to notify");
-          biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick);
+            logit("biffwatch: unknown action, $action; defaulting to notify");
+            biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick, $netid);
+          }
+        } else {
+          logit("biffatch called with no IRC network ID and thus no way to notify anyone of anything"
+                . " ($ckey, $category, [$n], $popnum, $usernick, $netid, $$pbr{id})");
         }
       } else {
         logit("biffwatch: no match for $category", 6) if $debug{biff} >= 4;
@@ -2068,10 +2115,14 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
 }
 
 sub biffnotify {
-  my ($ckey, $category, $detail, $headers, $popnum, $usernick) = @_;
+  my ($ckey, $category, $detail, $headers, $popnum, $usernick, $netid) = @_;
+  if (not $netid) {
+    logit("ERROR: biffnotify called without network id ($ckey, $category, $detail, headers, $popnum, $usernick, $netid)");
+    return;
+  }
   if (not $usernick) {
-    logit("biffnotify: called without usernick, defaulting to operator, $irc{oper} ($ckey, $category, $detail, $popnum)");
-    $usernick = $irc{oper};
+    logit("biffnotify: called without usernick, defaulting to operator, $irc{$netid}{oper} ($ckey, $category, $detail, $popnum)");
+    $usernick = $irc{$netid}{oper};
   }
   my @from = grep { /^From:/i } @$headers;
   if (not @from) {
@@ -2085,25 +2136,27 @@ sub biffnotify {
   my $from = (scalar @faddr) ? ", from $faddr[0]" : '';
   my $notification = qq[$category message [$detail] received (for $ckey$pnum)$from];
   addrecord("notification", +{ usernick  => $usernick,
-                               networkid => __NETWORK_ID__,
+                               ircnetworkid => $netid,
                                flags     => 'B', # B means Biff notification
                                message   => $notification,
                                enqueued  => DateTime::Format::ForDB(DateTime->now(@tz)),
                              });
 }
 
-sub processnotification {
+sub processnotification { # TODO: be more paranoid here about improperly formed records being in the table somehow.
   my @n = findnull("notification", 'dequeued');
   return if not scalar @n;
   my $n = shift @n;
-  my $recipient = $$n{usernick} || $irc{oper};
+  my $netid = $$n{ircnetworkid};
+  my $recipient = $$n{usernick} || $irc{$netid}{oper};
   # TODO: First check that the recipient is actually here.
   # For now, I'm going to just kind of assume that:
   my $message = $$n{message};
   logit("Processing Notification $$n{id}: $message");
   say($message,
-      channel => 'private',
-      sender  => $recipient,
+      networkid => $netid,
+      channel   => 'private',
+      sender    => $recipient,
      );
   $$n{dequeued} = DateTime::Format::ForDB(DateTime->now(@tz));
   updaterecord("notification", $n);
