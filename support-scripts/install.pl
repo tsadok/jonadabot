@@ -217,8 +217,8 @@ if (yesno("Initialize debug levels?")) {
       addrecord('config', +{
                             cfgprofile => $cfgprofile, networkid => $$network{id},
                             varname    => 'debug',     enabled   => 1,
-                            value      => ($allthesame ? $thevalue
-                                           : (askuser("Debug level for '$d'? (default: 0)") || 0)),
+                            value      => ($allthesame ? qq[$d=$thevalue]
+                                           : (qq[$d=].askuser("Debug level for '$d'? (default: 0)") || 0)),
                            });
     }
   }
