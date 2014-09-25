@@ -29,7 +29,7 @@ construct the DB config file for you.\n";
     print "is now available as well.\n";
     my $rdbms = lc askuser("Which RDBMS do you want to use?");
     my %supportedrdbms = map { $_ => 1 } qw(mysql postgres);
-    if ($supportedrdbms) {
+    if ($supportedrdbms{lc $rdbms}) {
       my $dbname = askuser("What do you want to call the database?  (default: jonadabot)")
         || 'jonadabot';
       my $dbhost = askuser("What host does the RDBMS run on?  (default: localhost)")
@@ -62,7 +62,7 @@ our ${sigil}password = '$dbpass';\n
       my $atsign = '@';
       my ($ourhost) = (`/bin/hostname` =~ /(\S+)/);
       $ourhost = 'localhost' if $dbhost eq 'localhost';
-      print "If you haven't done so already, you will need to create the $dbname database\n";
+      print "\n\nIf you haven't done so already, you will need to create the $dbname database\n";
       print "and grant privileges on it to $dbuser and set $dbuser's password to $dbpass\n";
       print "before going any further.\n";
       if ($rdbms eq 'postgres') {
@@ -194,6 +194,32 @@ for my $var (@var) {
       addrecord('config', +{ cfgprofile => $cfgprofile, networkid => $$network{id},
                              varname => $varname,       enabled => 1,
                              value   => (askuser("$question$dfltnote") || $default) });
+    }
+  }
+}
+
+################# Step 3B: Debug Settings:
+
+my @dbg = qw(alarm backscroll biff bottrigger connect ctcp filewatch
+             fork irc pingtime pop3 preference privatemsg publicmsg
+             recentactivity recurringalarm say siblings sitregex tea
+             timezone);
+if (yesno("Initialize debug levels?")) {
+  my %dbg = map { my ($k, $v) = split($$_{value}, /=/, 2)
+                } getconfigvar($cfgprofile, $$network{id}, 'debug');
+  my $allthesame = yesno("Initialize them all to the same value?");
+  my $thevalue;
+  if ($allthesame) {
+    $thevalue = askuser("What should I set them to?  (default: 0)") || "0";
+  }
+  for my $d (@dbg) {
+    if (not $dbg{$d}) {
+      addrecord('config', +{
+                            cfgprofile => $cfgprofile, networkid => $$network{id},
+                            varname    => 'debug',     enabled   => 1,
+                            value      => ($allthesame ? $thevalue
+                                           : (askuser("Debug level for '$d'? (default: 0)") || 0)),
+                           });
     }
   }
 }

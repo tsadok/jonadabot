@@ -9,7 +9,10 @@ our $servertz;
 
 sub DateTime::Format::ForDB {
   my ($dt) = @_;
-  return DateTime::Format::Pg->format_datetime($dt) if ref $dt;
+  if (ref $dt) {
+    my $fmt = "" . DateTime::Format::Pg->format_datetime($dt);
+    return $fmt;
+  }
   carp "Vogon Folk Music: $dt, $@$!";
 }
 
@@ -222,6 +225,7 @@ sub addrecord {
   my @ques  = map { "?" } @field;
   my @values  = map { $r{$_} } @field;
   my ($result, $q);
+  warn "Attempting to add record: " . Dumper($r) . "\n\n";
   eval {
     $q = $db->prepare("INSERT INTO $table (". (join ", ", @field)
                       . ") VALUES (" . (join ", ", @ques) . ")");

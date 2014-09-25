@@ -345,6 +345,7 @@ sub doscript {
 
 sub updateseen { # Don't call directly; call updatepingtimes() instead.
   my ($dt, $netid, $nick, $channel, $text) = @_;
+  ref $dt or carp "Cannot update seen record without a valid datetime: $dt";
   my @s = findrecord('seen', networkid => $netid, nick => $nick);
   my $whenseen = DateTime::Format::ForDB($dt);
   if (@s) {
@@ -370,7 +371,7 @@ sub updatepingtimes {
   my $oldtime = $irc{$netid}{pingtime};
   $irc{$netid}{pingtime} = DateTime->now(@tz);
   logit("Updated pingtime on network $netid from $oldtime to $irc{$netid}{pingtime}",3) if $debug{pingtime} > 6;
-  updateseen($irc{pingtime}, $netid, $sender, $channel, $text);
+  updateseen($irc{$netid}{pingtime}, $netid, $sender, $channel, $text);
 }
 
 sub checkpingtimes {
