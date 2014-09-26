@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use Carp;
 use AnyEvent::IRC::Util qw(encode_ctcp);
 
 our %debug = ( # These are the default defaults...
@@ -51,52 +52,51 @@ my $ourclan;
 sub loadconfig {
   $ourclan = getconfigvar($cfgprofile, undef, 'clan') || 'demilichens';
   for my $network (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1)) {
-    %irc = (
-            %irc, # preserve things that aren't specifically loaded, e.g., $irc{$$network{id}}{channel}
-            server  => getconfigvar($cfgprofile, $$network{id}, 'ircserver') || 'irc.freenode.net',
-            port    => getconfigvar($cfgprofile, $$network{id}, 'ircserverport') || 6667,
-            nick    => [ getconfigvar($cfgprofile, $$network{id}, 'ircnick'), $defaultusername ],
-            nsrv    => getconfigvar($cfgprofile, $$network{id}, 'ircnickserv') || 'NickServ',
-            user    => getconfigvar($cfgprofile, $$network{id}, 'ircusername') || $defaultusername,
-            real    => ("" . getconfigvar($cfgprofile, $$network{id}, 'ircrealname') || "anonymous ircbot operator") . ", represented by $devname",
-            pass    => getconfigvar($cfgprofile, $$network{id}, 'ircpassword') || 'm2RTLVG8iwm3onyNzFXSu0kOYFtdlGB5Nct',
-            email   => getconfigvar($cfgprofile, $$network{id}, 'ircemailaddress'),
-            clan    => $ourclan,
-            demi    => [ getclanmemberlist($ourclan) ],
-            chan    => ['#bot-test',
-                        #'#bot-testing',
-                        #'#bottesting',
-                        getconfigvar($cfgprofile, $$network{id}, 'ircchannel'),
-                       ],
-            okdom   => +{ map { $_ => 1 } (getconfigvar($cfgprofile, $$network{id}, 'ircchanokdom'), 'private')}, # channels it's ok to dominate
-            silent  => +{ map { $_ => 1 } (getconfigvar($cfgprofile, $$network{id}, 'ircchansilent'), '#freenode')}, # exact opposite, channels to shut up in
-            oper    => getconfigvarordie($cfgprofile, $$network{id}, 'defaultoperator'), # Primary nick for primary bot operator.
-            opers   => [uniq(getconfigvar($cfgprofile, $$network{id}, 'defaultoperator'),
-                             getconfigvar($cfgprofile, $$network{id}, 'operator')),
-                      # All active GROUPed nicks for primary bot operator.
-                      # Currently this doesn't do very much, but in a
-                      # future version the bot will look for you and
-                      # find which nick you are using if you are
-                      # online.
-                     ],
-            master  => +{ map { $_ => 1 }
-                          (getconfigvar($cfgprofile, $$network{id}, 'master')
-                         # Any nick listed as master can issue any
-                         # bot command, including privileged ones.
-                         # Don't list unregistered nicks as master,
-                         # for obvious reasons.  Nicks can be listed
-                         # as master without being the operator, and
-                         # vice versa.
-                          ),
-                        },
-            maxlines => getconfigvar($cfgprofile, $$network{id}, 'maxlines') || 12,
-            pinglims => [getconfigvar($cfgprofile, $$network{id}, 'pingtimelimit')],
-            pingtime => DateTime->now( @tz ),
-            pingbots => [getconfigvar($cfgprofile, $$network{id}, 'pingbot')], # Bots that will respond to !ping in a private /msg
-            siblings => [getconfigvar($cfgprofile, $$network{id}, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
-           );
-    undef $irc{__COLORCACHE__}; # This will get loaded when next used.
+    $irc{$$network{id}} = {
+                           %{$irc{$$network{id}}}, # preserve things that aren't specifically loaded, e.g., $irc{$$network{id}}{channel}
+                           server  => getconfigvar($cfgprofile, $$network{id}, 'ircserver') || 'irc.freenode.net',
+                           port    => getconfigvar($cfgprofile, $$network{id}, 'ircserverport') || 6667,
+                           nick    => [ getconfigvar($cfgprofile, $$network{id}, 'ircnick'), $defaultusername ],
+                           nsrv    => getconfigvar($cfgprofile, $$network{id}, 'ircnickserv') || 'NickServ',
+                           user    => getconfigvar($cfgprofile, $$network{id}, 'ircusername') || $defaultusername,
+                           real    => ("" . getconfigvar($cfgprofile, $$network{id}, 'ircrealname') || "anonymous ircbot operator") . ", represented by $devname",
+                           pass    => getconfigvar($cfgprofile, $$network{id}, 'ircpassword') || 'm2RTLVG8iwm3onyNzFXSu0kOYFtdlGB5Nct',
+                           email   => getconfigvar($cfgprofile, $$network{id}, 'ircemailaddress'),
+                           clan    => $ourclan,
+                           demi    => [ getclanmemberlist($ourclan) ],
+                           chan    => ['#bot-test',
+                                       #'#bot-testing',
+                                       #'#bottesting',
+                                       getconfigvar($cfgprofile, $$network{id}, 'ircchannel'),
+                                      ],
+                           okdom   => +{ map { $_ => 1 } (getconfigvar($cfgprofile, $$network{id}, 'ircchanokdom'), 'private')}, # channels it's ok to dominate
+                           silent  => +{ map { $_ => 1 } (getconfigvar($cfgprofile, $$network{id}, 'ircchansilent'), '#freenode')}, # exact opposite, channels to shut up in
+                           oper    => getconfigvarordie($cfgprofile, $$network{id}, 'defaultoperator'), # Primary nick for primary bot operator.
+                           opers   => [uniq(getconfigvar($cfgprofile, $$network{id}, 'defaultoperator'),
+                                            getconfigvar($cfgprofile, $$network{id}, 'operator')),
+                                       # All active GROUPed nicks for primary bot operator.
+                                       # Currently this doesn't do very much, but in a
+                                       # future version the bot will look for you and
+                                       # find which nick you are using if you are online.
+                                      ],
+                           master  => +{ map { $_ => 1 }
+                                         (getconfigvar($cfgprofile, $$network{id}, 'master')
+                                          # Any nick listed as master can issue any
+                                          # bot command, including privileged ones.
+                                          # Don't list unregistered nicks as master,
+                                          # for obvious reasons.  Nicks can be listed
+                                          # as master without being the operator, and
+                                          # vice versa.
+                                         ),
+                                       },
+                           maxlines => getconfigvar($cfgprofile, $$network{id}, 'maxlines') || 12,
+                           pinglims => [getconfigvar($cfgprofile, $$network{id}, 'pingtimelimit')],
+                           pingtime => DateTime->now( @tz ),
+                           pingbots => [getconfigvar($cfgprofile, $$network{id}, 'pingbot')], # Bots that will respond to !ping in a private /msg
+                           siblings => [getconfigvar($cfgprofile, $$network{id}, 'sibling')], # "buddy system"; if they go offline, we /msg our operator.
+                          };
   }
+  undef $irc{__COLORCACHE__}; # This will get loaded when next used.
 }
 loadconfig();
 
@@ -1176,6 +1176,7 @@ sub handlemessage {
         say($thing, networkid => $netid, channel => 'private', sender => $sender);
       }
     } else {
+      logit("!say attempt from $sender on network $netid");
       say("Tell them yourself, $sender",
           networkid => $netid, channel => 'private', sender => $sender);
     }
@@ -1931,8 +1932,9 @@ sub biffhelper {
       } else {
         logit("Error: no server address record for popbox $popbox");
       }
-    } else {
-      logit("ERROR: no popbox record for $popbox");
+#    } else {
+#      logit("ERROR: no popbox record for $popbox");
+#    }
     }
   }
   if (wantarray) {
