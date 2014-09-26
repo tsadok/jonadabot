@@ -119,7 +119,7 @@ warn "Database contains " . @log . " log files.\n";
             } @log;
 warn "   Filtered out all but " . @log . " of them.\n";
 for my $log (@log) { # X means disabled.
-  warn "      Considering $$log{mnemonic}\n" if $debug{filewatch};
+  warn "      Considering $$log{mnemonic}\n" if ($debug{filewatch} ||= 0);
   logit("Considering $$log{mnemonic} log ($$log{id})", 3) if $debug{filewatch};
   my $logfile = $$log{logfile};
   my @watch   = grep { not $$_{flags} or not ($$_{flags} =~ /X/)
@@ -217,11 +217,11 @@ for my $ircnet (findrecord("ircnetwork", cfgprofile => $cfgprofile, enabled => 1
                                       });
 $irc->reg_cb (privatemsg => sub {
                 my ($client, $nick, $ircmessage )= @_;
-                logit("Callback: privatemsg") if $debug{irc} > 3;
+                logit("Callback: privatemsg") if ($debug{irc} ||= 0) > 3;
                 print Dumper(+{ event => 'privatemsg',
                                 nick  => $nick,
                                 messg => $ircmessage,
-                              }) if $debug{privatemsg} > 5;
+                              }) if ($debug{privatemsg} ||= 0) > 5;
                 my ($recipient, $text) = @{$$ircmessage{params}};
                 logit("Private Message from $$ircmessage{prefix}: $text", 1) if $debug{privatemsg} > 1;
                 handlemessage($client, $netid, $$ircmessage{prefix}, $text, 'private');
@@ -261,7 +261,7 @@ our @identification = (nick     => $nick[0],
                        real     => $real,
                        password => $pass);
 logit("Connecting (cfgprofile: $cfgprofile; netid: $netid; server: $serv; port: $port; idenfication: @identification)")
-  if $debug{connect};
+  if (($debug{connect} ||= 0) > 0);
 $irc->connect($serv, $port, { @identification });
 warn "Stage " . (shift @stage) . " (connected/waiting)";
 }
