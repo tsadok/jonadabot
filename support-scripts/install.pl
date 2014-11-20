@@ -29,7 +29,7 @@ construct the DB config file for you.\n";
     print "is now available as well.\n";
     my $rdbms = lc askuser("Which RDBMS do you want to use?");
     my %supportedrdbms = map { $_ => 1 } qw(mysql postgres);
-    if ($supportedrdbms) {
+    if ($supportedrdbms{lc $rdbms}) {
       my $dbname = askuser("What do you want to call the database?  (default: jonadabot)")
         || 'jonadabot';
       my $dbhost = askuser("What host does the RDBMS run on?  (default: localhost)")
@@ -62,7 +62,7 @@ our ${sigil}password = '$dbpass';\n
       my $atsign = '@';
       my ($ourhost) = (`/bin/hostname` =~ /(\S+)/);
       $ourhost = 'localhost' if $dbhost eq 'localhost';
-      print "If you haven't done so already, you will need to create the $dbname database\n";
+      print "\n\nIf you haven't done so already, you will need to create the $dbname database\n";
       print "and grant privileges on it to $dbuser and set $dbuser's password to $dbpass\n";
       print "before going any further.\n";
       if ($rdbms eq 'postgres') {
@@ -128,6 +128,7 @@ if ($create eq "__DO_NOT_CREATE__") {
 ################# Step 3: Basic Config:
 
 our $cfgprofile       = askuser("Enter a short identifier for your configuration profile (default: jonadabot)") || 'jonadabot';
+our $ircnetworkname   = askuser("Enter the name of the IRC network you wish to configure (default: freenode)")  || 'freenode';
 
 my @var = (
            ['ircserver'            => 'irc.freenode.net', "Enter the domain name for an IRC network"],
@@ -142,7 +143,7 @@ my @var = (
            ['defaultoperator'      => '', "Nick on the IRC network for the bot's primary human operator"],
            ['master'               => [], "Nick of a person who can send the bot privileged commands"],
            ['maxlines'             => 10, "Maximum number of lines to return at once when answering a trigger"],
-           ['pingbot'              => ['Arsinoe', 'kotsovidalv'], "Other bot that will respond to /msg !ping to reset our timer"],
+           ['pingbot'              => ['Arsinoe', 'kstukri'], "Other bot that will respond to /msg !ping to reset our timer"],
            ['pingtimelimit'        => [15, 30, 45, 60], "Number of seconds of no channel activity before pinging"],
            ['sibling'              => [], "Other instance of $devname run by the same operator; they help keep tabs on one another"],
            ['ircchannel'           => [], "IRC channel to always connect to on startup"],
@@ -153,9 +154,25 @@ my @var = (
            ['pubdiruri'            => 'http://www.example.com/jonadabot', "Public URL pointing to the same directory as pubdirpath"],
           );
 my $questionsasked = 0;
+
+my %networkdefault = ( # TODO: add sane defaults for the major networks:
+                      freenode => +{ ircserver => 'chat.freenode.net', },
+                     );
+
+my $network = findrecord("ircnetwork", cfgprofile => $cfgprofile, networkname => $ircnetworkname );
+if (not ref $network) {
+  addrecord("ircnetwork", +{ cfgprofile  => $cfgprofile,
+                             networkname => $ircnetworkname,
+                             enabled     => 1,
+                           });
+  $network = findrecord("ircnetwork", cfgprofile => $cfgprofile, networkname => $ircnetworkname );
+  ref $network or die "Failed to create ircnetwork record for $ircnetworkname";
+}
+
 for my $var (@var) {
   my ($varname, $default, $question) = @$var;
-  if (not getconfigvar($cfgprofile, $varname)) {
+  $default = $networkdefault{$ircnetworkname}{$varname} || $default;
+  if (not getconfigvar($cfgprofile, $$network{id}, $varname)) {
     print "I may ask you some basic config questions.  Try to answer as best you can;\nbut don't worry: you can easily change your answers later in the config table in the database.\n\n"
       if not $questionsasked++;
     if (ref $default) {
@@ -166,14 +183,43 @@ for my $var (@var) {
         my $dfltnote = $dflt ? qq[ (default: $dflt)] : '';
         my $answer   = askuser("$question$dfltnote") || $dflt;
         if ($answer) {
-          addrecord('config', +{ cfgprofile => $cfgprofile, varname => $varname, enabled => 1, value => ($answer || $dflt) });
+          addrecord('config', +{ cfgprofile => $cfgprofile, networkid => $$network{id},
+                                 varname => $varname, enabled => 1, value => ($answer || $dflt) });
         } else {
           $done++;
         }
       }
     } else {
       my $dfltnote = $default ? qq[ (default: $default)] : '';
-      addrecord('config', +{ cfgprofile => $cfgprofile, varname => $varname, enabled => 1, value   => (askuser("$question$dfltnote") || $default) });
+      addrecord('config', +{ cfgprofile => $cfgprofile, networkid => $$network{id},
+                             varname => $varname,       enabled => 1,
+                             value   => (askuser("$question$dfltnote") || $default) });
+    }
+  }
+}
+
+################# Step 3B: Debug Settings:
+
+my @dbg = qw(alarm backscroll biff bottrigger connect ctcp filewatch
+             fork irc pingtime pop3 preference privatemsg publicmsg
+             recentactivity recurringalarm say siblings sitregex tea
+             timezone);
+if (yesno("Initialize debug levels?")) {
+  my %dbg = map { my ($k, $v) = split($$_{value}, /=/, 2)
+                } getconfigvar($cfgprofile, $$network{id}, 'debug');
+  my $allthesame = yesno("Initialize them all to the same value?");
+  my $thevalue;
+  if ($allthesame) {
+    $thevalue = askuser("What should I set them to?  (default: 0)") || "0";
+  }
+  for my $d (@dbg) {
+    if (not $dbg{$d}) {
+      addrecord('config', +{
+                            cfgprofile => $cfgprofile, networkid => $$network{id},
+                            varname    => 'debug',     enabled   => 1,
+                            value      => ($allthesame ? qq[$d=$thevalue]
+                                           : (qq[$d=].askuser("Debug level for '$d'? (default: 0)") || 0)),
+                           });
     }
   }
 }
@@ -199,8 +245,9 @@ for my $customcode (qw(timezone jonadabot_regexes jonadabot_extrasubs)) {
 
 # There are also the sample help files.
 my $helporig = catfile("data-files", "bot-help.html");
-if (-e $helporig) {
-  for my $pubdir (getconfigvar($cfgprofile, "pubdirpath")) {
+
+if (-e $helporig) { # we appear to have been run from the jonadabot dir
+  for my $pubdir (getconfigvar($cfgprofile, $$network{id}, "pubdirpath")) {
     my $dest = catfile($pubdir, "bot-help.html");
     if (yesno("Copy sample bot-help.html to $dest?")) {
       system("cp", $helporig, $dest);
@@ -234,7 +281,8 @@ if ((not getrecord("popserver")) and (yesno("Do you wish to set up email-related
         my $address  = askuser("Email address corresponding to $popuser on $serveraddress");
         my $owner    = askuser("IRC nick of user who owns this email account");
         my $mnemonic = askuser("Short mnemonic $owner can use to refer to this email account");
-        addrecord("popbox", +{ ownernick  => $owner,
+        addrecord("popbox", +{ ownernick    => $owner,
+                               ircnetworkid => $$network{id},
                                address    => $address,
                                popuser    => $popuser,
                                poppass    => $poppass,
@@ -281,7 +329,8 @@ if ((not getrecord("popserver")) and (yesno("Do you wish to set up email-related
           my $ircnick  = askuser("IRC nick of user who can use this mnemonic to send to this SMS target");
           my $mnemonic = askuser("Short identifier $ircnick can use to refer to this SMS target");
           addrecord("smsmnemonic", +{ destination => $destid,
-                                      ircnick     => $ircnick,
+                                      ircnetworkid => $$network{id},
+                                      ircnick      => $ircnick,
                                       mnemonic    => $mnemonic, });
           $anothermnemonic = "another";
         }
@@ -313,6 +362,7 @@ if (not getrecord("logfile")) {
       addrecord("logfilewatch", +{ logfile     => $lfid,
                                    matchstring => $matchstring,
                                    isregexkey  => (($isregexkey) ? 1 : 0),
+                                   ircnetworkid => $$network{id},
                                    nicktomsg   => $nicktomsg,
                                    msgprefix   => $msgprefix,
                                    channel     => $channel,

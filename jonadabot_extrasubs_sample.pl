@@ -44,13 +44,15 @@ our %routine = (
                                              })
                     }
                     if ($arg{channel} ne 'private') {
-                      my $ch = $arg{channel}; # lexical closure
-                      $irc{situationalregex}{$ch}{hangman} =
+                      my $nid = $arg{networkid}; # lexical closure
+                      my $ch  = $arg{channel};   # lexical closure
+                      $irc{situationalregex}{$nid}{$ch}{hangman} =
                         +{  enabled  => 1,
                             regex    => qr/^([a-z]|$word|details?|guess(?:es)?|state|letters?|bank)$/i,
                             callback => sub { my ($rekey, $txt, %x) = @_;
                                               my $response = $routine{hangman}->("situationalregex",
                                                                                  situation => $rekey,
+                                                                                 networkid => $x{networkid},
                                                                                  channel   => $x{channel},
                                                                                  text      => qq[!hangman $txt],
                                                                                  sender    => $x{sender},
@@ -69,13 +71,13 @@ our %routine = (
                       $$srec{value} = "DONE:$word";
                       updaterecord('userpref', $srec);
                       logit("!hangman: rope shortened",4);
-                      delete $irc{situationalregex}{$arg{channel}};
+                      delete $irc{situationalregex}{$arg{networkid}}{$arg{channel}};
                       return "$irc{oper} has shortened the rope!  You have been hanged!";
                     } else {
                       if ((index((lc $text), (lc $word)) >= 0)) {
                         $$srec{value} = "DONE:$word";
                         updaterecord('userpref', $srec);
-                        delete $irc{situationalregex}{$arg{channel}};
+                        delete $irc{situationalregex}{$arg{networkid}}{$arg{channel}};
                         return "Yep.";
                       } elsif ($text =~ /^!hangman (details|guesses|state)/) {
                         return "Guessed Right: $right; Guessed Wrong: $wrong; $remaining guesses left.";
@@ -115,7 +117,7 @@ our %routine = (
                             $$srec{value} = "DONE:$word";
                             updaterecord("userpref", $srec);
                             logit("!hanged", 6) if $debug{hangman};
-                            delete $irc{situationalregex}{$arg{channel}};
+                            delete $irc{situationalregex}{$arg{networkid}}{$arg{channel}};
                             return "/me draws a rope.  You have been hanged!";
                           } else {
                             my $bp = "a " . $bodypart[length $wrong];
@@ -153,7 +155,7 @@ our %routine = (
                                                           'waffle fries', 'curly fries', 'sweet potato fries',
                                                           'fried cheese sticks', 'fish sticks', 'fried chicken fingers',
                                                           'deep fried twinkies', 'deep fried candy bars',
-                                                          'fried eggrolls', 'deep-fried mushrooms', 'deep-fried broccoli',
+                                                          'fried eggrolls', 'deep-xfried mushrooms', 'deep-fried broccoli',
                                                           'potato cakes', 'latkesim'],
                                              sweeten  => [''],
                                              flavors  => [''],

@@ -28,6 +28,14 @@ sub ctine {
   #   $fields );
   #END IF;\n];
 }
+# IRC networks:
+my $q = $db->prepare(ctine("ircnetwork",
+    "id           SERIAL,
+     cfgprofile   VARCHAR(255),
+     enabled      int2,
+     networkname  VARCHAR(255),
+     flags        VARCHAR(255)"));
+$q->execute();
 
 # configuration variables:
 my $q = $db->prepare(ctine('config',
