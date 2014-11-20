@@ -357,11 +357,11 @@ sub updateseen { # Don't call directly; call updatepingtimes() instead.
     $$s{notes}    = '';
     updaterecord('seen', $s);
   } else {
-    addrecord('seen', +{ nick     => $nick,
+    addrecord('seen', +{ nick      => $nick,
                          networkid => $netid,
-                         whenseen => $whenseen,
-                         channel  => $channel,
-                         details  => $text,
+                         whenseen  => $whenseen,
+                         channel   => $channel,
+                         details   => $text,
                        });
   }
 }
@@ -397,7 +397,7 @@ sub checkpingtimes {
     my $limit = $pt->clone()->add( seconds => $lim );
     logit("now $now, limit $limit", 4) if $debug{pingtime} > 5;
     return if $limit > $now;
-    logit("Past ping limit ($lim seconds), pinging $bot");
+    logit("Past ping limit ($lim seconds), pinging $bot") if $debug{pingtime};
     my $pingcmd = getconfigvar($cfgprofile, qq[customping_$bot]) || "!ping";
     say($pingcmd, networkid => $$network{id}, channel => 'private', sender => $bot);
     push @bot, $bot;
@@ -1841,6 +1841,11 @@ sub biffhelper {
   my ($popbox, $msgnum, $fields, $suppresswatch, $networkid, $ownernick, $caller) = @_;
   warn "biffhelper: no networkid (from $caller)" if not $networkid;
   warn "biffhelper: no ownernick (from $caller)" if not $ownernick;
+  if ($debug{biff} > 4) {
+    logit(qq[biffhelper($popbox, $msgnum, [@$fields], $suppresswatch, $networkid, $ownernick, $caller)]);
+  } elsif ($debug{biff} > 1) {
+    logit(qq[biffhelper($popbox, $msgnum, ...)]);
+  }
   my (@answer);
   $fields ||= $msgnum ? ['Subject'] : ['COUNT'];
   for my $field (@$fields) {
