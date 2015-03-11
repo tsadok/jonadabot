@@ -23,6 +23,10 @@
      <li><a href="#preferences">Your Preferences</a><ul>
            <li><a href="#showpref">!show</a></li>
            <li><a href="#setpref">!set</a></li>
+           <li><a href="#prefbackscrolldelivery">backscrolldelivery</a></li>
+           <li><a href="#prefhangmanspacing">hangmanspacing</a></li>
+           <li><a href="#prefdiet">diet</a></li>
+           <li><a href="#prefmemo">memo</a></li>
            <li><a href="#preftimezone"><code>timezone</code></a></li>
        </ul></li>
      <li><a href="#selfcommands">Personal Assistance (Keeping Track of Things)</a><ul>
@@ -44,7 +48,8 @@
                !asc, !ascension, !lg, !grepsrc, !whereis, !streak, !save</li>
           </ul></li>
      <li><a href="#frivolity">Frivolous Pursuits</a><ul>
-         <li><a href="#food">!food, !pizza, !sandwiches, !dessert, !tea, !juice, !milk</a></li>
+         <li><a href="#food">!food, !pizza, !sandwiches, !dessert, !tea, !juice, !milk, !corpse</a></li>
+         <li><a href="#trout">!trout</a>
          <li><a href="#vladsbane">!vladsbane</a></li>
          <li><a href="#hangman">!hangman</a></li>
          <li><a href="#scramble">!scramble</a></li>
@@ -155,6 +160,33 @@
 <div class="p">
   <div><a name="setpref" class="trigger">!set</a> <span class="triggerargs">prefname value</span></div>
   Sets a different value for the preference for you.
+</div>
+<div class="p">
+  <div><a name="prefbackscrolldelivery" class="prefname">backscrolldelivery</a></div>
+  Controls how the <a href="#backscroll">!backscroll</a> command sends you information.
+  The bot's software recognizes <span class="triggerargverbatim">HTML</span> and
+  <span class="triggerargvervatim">/msg</span> as possible values, but whether either
+  or both of these methods are actually available depends on how the bot operator has
+  configured things.  Availability of the backscroll feature my vary from one channel
+  to another.
+</div>
+<div class="p">
+  <div><a name="prefhangmanspacing" class="prefname">hangmanspacing</a></div>
+  Number of spaces to put between letter blanks in <a href="#hangman">hangman</a> puzzles.
+  The default is 0 (no spaces).
+</div>
+<div class="p">
+  <div><a name="prefdiet" class="prefname">diet</a></div>
+  Setting this to <span class="triggerargverbatim">vegetarian</span> or
+  <span class="triggerargverbatim">kosher</span> will cause the
+  <a href="#food">!food service</a> to be somewhat pickier about what it serves
+  on your behalf.  (The preference of the person calling for the food is used.)
+</div>
+<div class="p">
+  <div><a name="prefmemo" class="prefname">memo</a></div>
+  This preference has no actual effect, but you can use it as a convenient place to store a small
+  piece of information, which the bot can then recall for you later (via
+  <a href="#showpref">!show <span class="prefname">memo</span></a>).
 </div>
 <div class="p">
   <div><a name="preftimezone" class="prefname">timezone</a></div>
@@ -295,6 +327,15 @@
   Serves up the requested food or beverage.  Types of tea that can be specified include black,
   green, white, oolang, and herbal.  (You don't get to specify all the details.  A certain amount
   of randomness is part of the fun.)  All arguments to these commands are optional.
+  
+</div>
+
+<div class="p">
+  <div><a name="trout" class="trigger">!trout</a> <span class="triggerargsnone">[no arguments]</span></div>
+  <div><a class="trigger">!trout</a> <span class="triggerargs">nick</span></div>
+  <div><a class="trigger">!trout</a> <span class="triggerargsverbatim">me</span></div>
+  <div><a class="trigger">!trout</a> <span class="triggerargsverbatim">yourself</span></div>
+  Slaps someone with a fish.  Or something like that.
 </div>
 
 <div class="p">
@@ -304,7 +345,7 @@
 
 <div class="p">
   <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargsnone">[no arguments]</span></div>
-  Show the current hangman puzzle (or start a new one if necessary).
+  Shows the current hangman puzzle (or start a new one if necessary).
   Note that if you use private /msg to play you will get a separate puzzle just for you.
   If you play in a channel, you share the puzzle with everyone in the channel.
   <div><a name="hangman" class="trigger">!hangman</a> <span class="triggerargs">letter</span></div>

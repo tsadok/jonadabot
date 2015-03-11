@@ -184,6 +184,7 @@ sub tea {
                                       'herbal tea', 'mint tea', 'orange tea', 'lemon tea',
                                       ('herbal blend #' . (1 + int rand int rand int rand 98)),
                                       'chamomile tea', 'sassafras tea', 'ginger tea',
+                                      'pomegranate tea', 'raspberry tea',
                                       'guarana', 'yerba mate', 'tisane', 'yarrow tea',
                                       'peppermint tea', 'wintergreen tea', 'spearmint tea',
                                       'echinacea tea', 'ginseng tea', 'oksusu cha', 'pine tea',
