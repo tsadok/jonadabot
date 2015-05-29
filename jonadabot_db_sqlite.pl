@@ -28,6 +28,7 @@
 # DELETE:  $result  = deleterecord('tablename', $id);
 
 use strict;
+use Carp;
 use DBI();
 use DateTime::Format::SQLite;
 

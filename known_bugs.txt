@@ -16,6 +16,8 @@ Known bugs:
    a user's timezone, it is calculated incorrectly.
 
 Features Wanted:
+ * An install script that prompts for rdbms (multiple choice) and
+   generates the db config then calls the create tables script.
  * TODO-list management:
      !todo set Remember to blah blah blah
      !todo list (just list the id numbers of your todo items)
