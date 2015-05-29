@@ -26,7 +26,7 @@ do "timezone.pl"; $servertz or die "FATAL Error: servertz not set\nYou need to c
 our $devname          = 'jonadabot';
 our $author           = 'Jonadab the Unsightly One';
 our $version          = '006';
-our $devstatus        = 'beta';
+our $devstatus        = '.0';
 our $gitpage          = 'https://gitorious.org/jonadabot';
 our $logfile          = "/var/log/jonadabot_$version.log";
 our $utilsubs         = "jonadabot_utilsubs.pl";

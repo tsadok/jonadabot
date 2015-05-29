@@ -12,7 +12,7 @@ sub watchlogfile {
   logit("" . @watch . " watch records found", 2) if $debug{filewatch} > 2;
   my ($whenseen, $expires, $note);
   for my $watch (@watch) {
-    my ($ismatch, @followup);
+    my ($ismatch, @followup, $noecho);
     if ($$watch{isregexkey}) {
       logit("Watch record is a regex key", 3) if $debug{filewatch} > 2;
       for my $watchitem (@{$watchregex{$$watch{matchstring}}}) {
@@ -35,8 +35,15 @@ sub watchlogfile {
             } else {
               $ismatch++;
               $note     ||= join ", ", @$fieldlist;
-                push @followup, $_ for ($answer, @more);
-                logit("Callback returned followup line(s).") if $debug{filewatch} > 4;
+              for my $m ($answer, @more) {
+                if ($m =~ /__NO_ECHO__/) {
+                  logit("Callback says do not echo.");
+                  $noecho = 1;
+                } else {
+                  push @followup, $m;
+                  logit("Callback returned followup line(s).") if $debug{filewatch} > 4;
+                }
+              }
             }
           } else {
             $ismatch++;
@@ -59,7 +66,8 @@ sub watchlogfile {
         my $msg = ($$watch{msgprefix} ? "$$watch{msgprefix}: " : '') . $line;
         if (not findrecord('announcement', detail => $msg, context => $$watch{nicktomsg})) {
           warn "No nick to msg" if not $$watch{nicktomsg};
-          say($msg, channel => 'private', sender => $$watch{nicktomsg});
+          say($msg, channel => 'private', sender => $$watch{nicktomsg})
+            unless $noecho;
           addrecord("announcement", +{ detail   => $msg,
                                        whenseen => $whenseen,
                                        expires  => $expires,
@@ -74,7 +82,8 @@ sub watchlogfile {
       if ($$watch{channel}) {
         my $msg = ($$watch{chanprefix} ? "$$watch{chanprefix}: " : '') . $line;
         if (not findrecord('announcement', detail => $msg, context => $$watch{channel})) {
-          say($msg, channel => $$watch{channel}, sender => $irc{oper}, fallbackto => 'private');
+          say($msg, channel => $$watch{channel}, sender => $irc{oper}, fallbackto => 'private')
+            unless $noecho;
           # TODO: maybe add a flag to not fall back to private /msg
           logit("Echoed to $$watch{channel}") if $debug{filewatch} > 5;
           for my $followup (@followup) {
