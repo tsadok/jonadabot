@@ -1,7 +1,12 @@
 #!/usr/bin/perl
 # -*- cperl -*-
 
-# This is the MySQL implementation of jonadabot_db.pl
+# This is the SQLite implementation of jonadabot_db.pl
+
+# It is suggested to install DBI::Shell for the dbish utility
+# so that you can access the db from the command line like so:
+# dbish dbi:SQLite:/path/to/jonadab.sqlite
+# Alternately, the sqlite3 command line tool should also work.
 
 # Database functions:
 # ADD:     $result  = addrecord(tablename, $record_as_hashref);
@@ -18,29 +23,26 @@
 # SEARCH:  @records = searchrecord(tablename, fieldname, value_substring);
 # COUNT:   %counts  = %{countfield(tablename, fieldname)}; # Returns a hash with counts for each value.
 # COUNT:   %counts  = %{countfield(tablename, fieldname, start_dt, end_dt)}; # Ditto, but within the date range; pass DateTime objects.
-# GET BY DATE:        (Last 3 args optional.  Dates, if specified, must be formatted for MySQL already.)
+# GET BY DATE:        (Last 3 args optional.  Dates, if specified, must be formatted for the database already.)
 #          @records = @{getrecordbydate(tablename, datefield, mindate, maxdate, maxfields)};
 # DELETE:  $result  = deleterecord('tablename', $id);
 
-# MySQL also provides regular expression capabilities; I might add a
-# function for that here at some future point.
-
 use strict;
 use DBI();
-use DateTime::Format::MySQL;
+use DateTime::Format::SQLite;
 
 sub DateTime::Format::ForDB {
   my ($dt) = @_;
   if (ref $dt) {
     $dt->set_time_zone("UTC");
-    return DateTime::Format::MySQL->format_datetime($dt);
+    return DateTime::Format::SQLite->format_datetime($dt);
   }
   carp "Vogon Folk Music: $dt, $@$!";
 }
 
 sub DateTime::Format::FromDB {
   my ($string) = @_;
-  my $dt = DateTime::Format::MySQL->parse_datetime($string);
+  my $dt = DateTime::Format::SQLite->parse_datetime($string);
   $dt->set_time_zone("UTC");
   return $dt;
 }
@@ -49,11 +51,8 @@ my $db;
 sub dbconn {
   # Returns a connection to the database.
   # Used by the other functions in this file.
-  $db = DBI->connect("DBI:mysql:database=$dbconfig::database;host=$dbconfig::host",
-                     $dbconfig::user, $dbconfig::password, {'RaiseError' => 1})
-    or die ("Cannot Connect: $DBI::errstr\n");
-  #my $q = $db->prepare("use $dbconfig::database");
-  #$q->execute();
+  $db = DBI->connect("dbi:SQLite:dbname=$dbconfig::database", {'RaiseError' => 1})
+    or die ("Cannot Connect (to $dbconfig::database): $DBI::errstr\n");
   return $db;
 }
 
@@ -74,7 +73,6 @@ sub getnext {
                        . (join " AND ", ("$field > ?", map { "$_=?" } @field) )
                        . qq[ ORDER BY $field LIMIT 1];
   my @arg = ($oldvalue, map { $fv{$_} } @field);
-  #use Data::Dumper; warn Dumper(+{ query => $query, arg => \@arg, location => 'getnext' });
   my $q = $db->prepare($query);
   $q->execute(@arg);
   return $q->fetchrow_hashref();
@@ -134,7 +132,7 @@ sub getsince {
 # GETNEW:  @records =   getsince(tablename, datetimefield, datetimeobject);
   my ($table, $dtfield, $dt, $q) = @_;
   die "Too many arguments: getrecord(".(join', ',@_).")" if $q;
-  my $when = DateTime::Format::MySQL->format_datetime($dt);
+  my $when = DateTime::Format::ForDB($dt);
   my $db = dbconn();
   $q = $db->prepare("SELECT * FROM $table WHERE $dtfield >= ?");  $q->execute($when);
   my @answer; my $r;
@@ -145,7 +143,7 @@ sub getsince {
 }
 
 sub getrecordbydate {
-# GET BY DATE:        (Dates, if specified, must be formatted for MySQL already.)
+# GET BY DATE:        (Dates, if specified, must be formatted for the database already.)
 #          @records = @{getrecordbydate(tablename, datefield, mindate, maxdate, maxfields)};
   my ($table, $field, $mindate, $maxdate, $maxfields, $q) = @_;
   die "Too many arguments: getrecordbydate(".(join', ',@_).")" if $q;
@@ -166,7 +164,7 @@ sub getrecordbydate {
   my (@r, $r);
   while ($r = $q->fetchrow_hashref()) { push @r, $r; }
   if ($maxfields and @r > $maxfields) {
-    # Fortuitously, MySQL-formatted datetime strings sort correctly when sorted ASCIIbetically:
+    # Fortuitously, DB-formatted datetime strings generally sort correctly when sorted ASCIIbetically:
     @r = sort { $$a{$field} <=> $$b{$field} } @r;
     if ($maxdate and not $mindate) {
       # If only the maxdate is specified, we want the _last_ n items before that:
@@ -206,7 +204,7 @@ sub changerecord {
   my $q = $db->prepare("update $table set $field=? where id='$id'");
   my $answer;
   eval { $answer = $q->execute($value); };
-  carp "Unable to change record: $@" if $@;
+  carp "Unable to change record ($table, $id, $field, $value): $@" if $@;
   return $answer;
 }
 
@@ -242,19 +240,21 @@ sub addrecord {
   my %r = %{$r};
   croak "Record must contain at least one field" if not keys %r;
   my $db = dbconn();
-  my @clauses = map { "$_=?" } sort keys %r;
-  my @values  = map { $r{$_} } sort keys %r;
+  my @field = sort keys %r;
+  my @param = map { "?" } @field;
+  my @value = map { $r{$_} } @field;
   my ($result, $q);
   eval {
-    $q = $db->prepare("INSERT INTO $table SET ". (join ", ", @clauses));
-    $result = $q->execute(@values);
+    $q = $db->prepare("INSERT INTO $table (". (join ", ", @field) . ") "
+                      . "VALUES (" .(join ", ", @param). ")");
+    $result = $q->execute(@value);
   };
   if ($@) {
     use Data::Dumper;
     confess "Unable to add record: $@\n" . Dumper(@_);
   }
   if ($result) {
-    $db::added_record_id=$q->{mysql_insertid}; # Calling code can read this magic variable if desired.
+    $db::added_record_id = $db->func('last_insert_rowid'); # Calling code can read this magic variable if desired.
   } else {
     warn "addrecord failed: " . $q->errstr;
   }
@@ -272,8 +272,8 @@ sub countfield {
   }
   my $whereclause;
   if (ref $enddt) {
-    my $start = DateTime::Format::MySQL->format_datetime($startdt);
-    my $end   = DateTime::Format::MySQL->format_datetime($enddt);
+    my $start = DateTime::Format::ForDB($startdt);
+    my $end   = DateTime::Format::ForDB($enddt);
     $whereclause = " WHERE fromtime > '$start' AND fromtime < '$end'";
   }
   for my $field (keys %crit) {
