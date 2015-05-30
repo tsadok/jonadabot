@@ -20,7 +20,7 @@ use DateTime::Format::Mail;
 
 our $cfgprofile = ((grep { $_ } map { /^cfgprofile=(\w+)/; $1 } @ARGV), 'jonadabot')[0];
 print "Using config profile: $cfgprofile\n";
-our $servertz = 'undef'; # We need to know the timezone of the computer the bot runs on:
+our $servertz = undef; # We need to know the timezone of the computer the bot runs on:
 do "timezone.pl"; $servertz or die "FATAL Error: servertz not set\nYou need to create a timezone.pl, see timezone_sample.pl for an example.\n";
 
 our $devname          = 'jonadabot';
