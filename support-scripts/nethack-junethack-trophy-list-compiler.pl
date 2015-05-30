@@ -1,26 +1,26 @@
 #!/usr/bin/perl -w
 # -*- cperl -*-
 
-our $ourclan  = 'demilichens';
+our $ourclan  = 'newts';
 our $clansdir = '/b4/perl/nethack-junethack-unique-deaths-tempdir';
 our $result   = '/var/www/nethack-stuff/trophies-needed.html';
+our $tourney  = 'https://junethack.net';
 
 our (%trophy, %variantorder);
 
-my %clanpage = (
-                demilichens     => 'https://junethack.net/clan/demilichens',
-                blackjack       => 'https://junethack.net/clan/BlackjackAndHookers',
-                goons           => 'https://junethack.net/clan/Goonsinjune',
-                justice         => 'https://junethack.net/clan/Justice',
-                oldskul         => 'https://junethack.net/clan/OldSkul',
-                s_mold          => 'https://junethack.net/clan/Smile_Mold',
-                snap            => 'https://junethack.net/clan/Snap',
-                splat           => 'https://junethack.net/clan/TeamSplat',
-                wicked          => 'https://junethack.net/clan/WiCked',
-                yetanother      => 'https://junethack.net/clan/YAJNHC',
-                hi              => 'https://junethack.net/clan/hi',
-                overcaffeinated => 'https://junethack.net/clan/overcaffeinated',
-               );
+our %clan = ( # TODO: put this in the database
+             awesome  => 'ClanAwesome',
+             cookies  => 'Dropped_Cookies',
+             explodes => 'ItExplodes',
+             smile    => 'SmileMold',
+             newts    => 'deminewts',
+             ddpp     => 'dingdongpingpong', # kerio is a boat
+             fantasy  => 'fantasy',
+             overcaff => 'overcaffeinated',
+             splat    => 'teamsplat',
+            );
+
+my %clanpage = map { $_ => qq[$tourney/clan/$clan{$_}] } keys %clan;
 
 use HTML::TreeBuilder;
 
