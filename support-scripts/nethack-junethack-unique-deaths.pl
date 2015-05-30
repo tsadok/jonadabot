@@ -1,10 +1,11 @@
 #!/usr/bin/perl -w
 # -*- cperl -*-
 
-our $ourclan  = 'demilichens';
+our $ourclan  = 'newts';
 our $tempdir  = '/b4/perl/nethack-junethack-unique-deaths-tempdir';
 our $result   = '/var/www/nethack-stuff/deaths-needed.html';
 our $altres   = '/var/www/nethack-stuff/deaths-obtained.html';
+our $tourney  = 'https://junethack.net';
 
 our $theclan  = $ourclan;
 my  @clanarg  = grep { /^clan=/ } @ARGV;
@@ -14,20 +15,19 @@ if (@clanarg) {
   $altres     = qq[/var/www/nethack-stuff/deaths-obtained-$theclan.html];
 }
 
-my %clanpage = ( # TODO: construct this list by scraping it from the junethack site.
-                demilichens     => 'https://junethack.de/clan/demilichens',
-                blackjack       => 'https://junethack.de/clan/BlackjackAndHookers',
-                goons           => 'https://junethack.de/clan/Goonsinjune',
-                justice         => 'https://junethack.de/clan/Justice',
-                oldskul         => 'https://junethack.de/clan/OldSkul',
-                s_mold          => 'https://junethack.de/clan/Smile_Mold',
-                snap            => 'https://junethack.de/clan/Snap',
-                splat           => 'https://junethack.de/clan/TeamSplat',
-                wicked          => 'https://junethack.de/clan/WiCked',
-                yetanother      => 'https://junethack.de/clan/YAJNHC',
-                hi              => 'https://junethack.de/clan/hi',
-                overcaffeinated => 'https://junethack.de/clan/overcaffeinated',
-               );
+our %clan = ( # TODO: put this in the database
+             awesome  => 'ClanAwesome',
+             cookies  => 'Dropped_Cookies',
+             explodes => 'ItExplodes',
+             smile    => 'SmileMold',
+             newts    => 'deminewts',
+             ddpp     => 'dingdongpingpong', # kerio is a boat
+             fantasy  => 'fantasy',
+             overcaff => 'overcaffeinated',
+             splat    => 'teamsplat',
+            );
+
+my %clanpage = map { $_ => qq[$tourney/clan/$clan{$_}] } keys %clan;
 
 my (%death, %clandeath);
 
