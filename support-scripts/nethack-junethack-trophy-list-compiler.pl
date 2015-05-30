@@ -8,18 +8,18 @@ our $result   = '/var/www/nethack-stuff/trophies-needed.html';
 our (%trophy, %variantorder);
 
 my %clanpage = (
-                demilichens     => 'https://junethack.de/clan/demilichens',
-                blackjack       => 'https://junethack.de/clan/BlackjackAndHookers',
-                goons           => 'https://junethack.de/clan/Goonsinjune',
-                justice         => 'https://junethack.de/clan/Justice',
-                oldskul         => 'https://junethack.de/clan/OldSkul',
-                s_mold          => 'https://junethack.de/clan/Smile_Mold',
-                snap            => 'https://junethack.de/clan/Snap',
-                splat           => 'https://junethack.de/clan/TeamSplat',
-                wicked          => 'https://junethack.de/clan/WiCked',
-                yetanother      => 'https://junethack.de/clan/YAJNHC',
-                hi              => 'https://junethack.de/clan/hi',
-                overcaffeinated => 'https://junethack.de/clan/overcaffeinated',
+                demilichens     => 'https://junethack.net/clan/demilichens',
+                blackjack       => 'https://junethack.net/clan/BlackjackAndHookers',
+                goons           => 'https://junethack.net/clan/Goonsinjune',
+                justice         => 'https://junethack.net/clan/Justice',
+                oldskul         => 'https://junethack.net/clan/OldSkul',
+                s_mold          => 'https://junethack.net/clan/Smile_Mold',
+                snap            => 'https://junethack.net/clan/Snap',
+                splat           => 'https://junethack.net/clan/TeamSplat',
+                wicked          => 'https://junethack.net/clan/WiCked',
+                yetanother      => 'https://junethack.net/clan/YAJNHC',
+                hi              => 'https://junethack.net/clan/hi',
+                overcaffeinated => 'https://junethack.net/clan/overcaffeinated',
                );
 
 use HTML::TreeBuilder;
@@ -65,7 +65,7 @@ for my $tr (@tr) {
 my ($membercount, $trophycount, $variantcount) = (0,0,0);
 for my $m (@member) {
   my ($name, $relurl) = @$m;
-  my $absurl = "http://junethack.de" . $relurl;
+  my $absurl = "http://junethack.net" . $relurl;
   my $mfile  = $clansdir . $relurl . ".html";
   if (not grep { /reparse/} @ARGV) {
     unlink $mfile;
@@ -98,12 +98,12 @@ for my $m (@member) {
                                class => qr/imagelink/, );
     for my $imgl (@imgl) {
       my $relurl = $imgl->attr('href');
-      my $absurl = "http://junethack.de" . $relurl;
+      my $absurl = "http://junethack.net" . $relurl;
       my ($title, $subtitle) = $imgl->attr('title') =~ /^(.*?)(?:[:](.*))?$/;
       $subtitle ||= '';
       my $imgelt = ($imgl->look_down( _tag => 'img' ))[0];
       my $imgsrc = $imgelt->attr('src');
-      my $absimg = "http://junethack.de" . $imgsrc;
+      my $absimg = "http://junethack.net" . $imgsrc;
       my $needed = ($imgsrc =~ /light[.]png$/) ? 1 : 0;
       $trophy{$variant}{$title}{title}    = $title;
       $trophy{$variant}{$title}{subtitle} = $subtitle;
