@@ -126,8 +126,10 @@ if ($changedconfig and
         : undef
       } @field) . "\n   );\n42;\n";
   close CFG;
-  print "Next step:  run the createtables script, if you haven't already.
-  perl jonadabot_createtables_$main::dbconfig{rdbms}.pl\n";
+  print "Next steps:
+ * run the createtables script (if you haven't already):
+   perl jonadabot_createtables_$main::dbconfig{rdbms}.pl
+ * create timezone.pl (see timezone_sample.pl for an example)\n";
 }
 
 exit 0; # Subroutines follow.
