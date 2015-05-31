@@ -25,6 +25,7 @@ our %clan = ( # TODO: put this in the database
              fantasy  => 'fantasy',
              overcaff => 'overcaffeinated',
              splat    => 'teamsplat',
+             kitten   => 'BittenByAKitten',
             );
 
 my %clanpage = map { $_ => qq[$tourney/clan/$clan{$_}] } keys %clan;
