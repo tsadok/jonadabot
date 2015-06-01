@@ -798,10 +798,11 @@ sub handlemessage {
         my ($oclan) = $oclan[-1] =~ /^clan=(\w+)/;
         $page = "deaths-$oclan.html";
       }
-      say("http://74.135.83.0:8018/nethack-stuff/$page",
+      my $urlbase = getconfigvar($cfgprofile, 'pubdiruri');
+      say("$urlbase/$page",
           channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
       if ($page eq 'deaths-needed.html') {
-        say("http://74.135.83.0:8018/nethack-stuff/deaths-obtained.html",
+        say("$urlbase/deaths-obtained.html",
             channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
       }
     };
@@ -813,7 +814,8 @@ sub handlemessage {
   } elsif ($text =~ /^!troph[yies]+\s*(.*)/) { # TODO: generalize this by allowing commands/scripts to be listed in the DB.
     my @extraarg = grep { /^(reparse|partial|url)$/ } split /\s+/, $1;
     my $sayresults = sub {
-      say("http://74.135.83.0:8018/nethack-stuff/trophies-needed.html",
+      my $urlbase = getconfigvar($cfgprofile, 'pubdiruri');
+      say("$urlbase/trophies-needed.html",
           channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
     };
     if (grep { /url/ } @extraarg) {

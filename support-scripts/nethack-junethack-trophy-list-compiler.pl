@@ -9,16 +9,19 @@ our $tourney  = 'https://junethack.net';
 our (%trophy, %variantorder);
 
 our %clan = ( # TODO: put this in the database
+             kitten   => 'BittenByAKitten',
              awesome  => 'ClanAwesome',
              cookies  => 'Dropped_Cookies',
+             goons    => 'GoonsInJune',
              explodes => 'ItExplodes',
              smile    => 'SmileMold',
+             bots     => 'bothack',
              newts    => 'deminewts',
              ddpp     => 'dingdongpingpong', # kerio is a boat
              fantasy  => 'fantasy',
+             fwil     => 'fwilclan',
              overcaff => 'overcaffeinated',
              splat    => 'teamsplat',
-             kitten   => 'BittenByAKitten',
             );
 
 my %clanpage = map { $_ => qq[$tourney/clan/$clan{$_}] } keys %clan;
