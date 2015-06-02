@@ -167,7 +167,8 @@ sub settimer {
                                       interval => 15,
                                       cb       => sub {
                                         processnotification();
-                                        biff($irc{oper}) if not $count++ % 25;
+                                        biff($irc{oper}, undef, 'settimer-biff-cb')
+					    if not $count++ % 25;
                                       }
                                      );
   $irc{timer}{script} = AnyEvent->timer(
@@ -1328,7 +1329,7 @@ sub handlemessage {
       # TODO: audit biff() to ensure they can only get their own mail,
       # then remove the master requirement here.
       logit("That's a general biff check request from $sender", 3) if $debug{biff} > 2;
-      biff($sender, 'saycount');
+      biff($sender, 'saycount', 'biff-trigger-nobox-master');
     }
   } elsif ($text =~ /^!notification/) {
     my @n = grep { $$_{usernick} eq $sender } findnull("notification", "dequeued");
@@ -1850,10 +1851,10 @@ sub biffhelper {
 }
 
 sub biff {
-  my ($owner, $saycount) = @_;
+  my ($owner, $saycount, $caller) = @_;
   my $total = 0;
-  logit("biff($owner, $saycount)", 4) if $debug{biff} > 2;
-  warn "biff(): no owner specified, defaulting to $irc{oper}" if not $owner;
+  logit("biff($owner, $saycount, $caller)", 4) if $debug{biff} > 2;
+  warn "biff($owner, $saycount, $caller): no owner specified, defaulting to $irc{oper}" if not $owner;
   $owner ||= $irc{oper};
   warn "biff(): no owner/operator" and return if not $owner;
   my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
@@ -1886,6 +1887,22 @@ sub biffwatch { # TODO:  unwrap wrapped header lines before processing.
         my $detail = join " / ", map { $_ =~ $regex; $1; } @match;
         my $scname = ($subcat eq $category) ? $subcat : "$category / $subcat";
         logit("biffwatch: matched $scname ($detail)", 6) if $debug{biff} >= 4;
+	if (ref $callback) {
+	    my $retval = $callback->($match[0],
+				     owner    => $usernick,
+				     popnum   => $popnum,
+				     ckey     => $ckey,
+				     category => $category,
+				     headers  => $headers,
+				     );
+	    if (not $retval) {
+		$action = 'ignore';
+	    } elsif ($retval =~ /^(notify|readbody|ignore)$/) {
+		$action = $1;
+	    } elsif ($retval) {
+		say($retval, channel => 'private', sender => $usernick);
+	    }
+	}
         if ($action eq 'notify') {
           logit("calling biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick)", 6) if $debug{biff} > 5;
           biffnotify($ckey, $category, $detail, $headers, $popnum, $usernick);
