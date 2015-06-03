@@ -55,7 +55,7 @@ my @ptbl = $clmemb[0]->look_down(
 my @tr = $ptbl[0]->look_down(
                              _tag => 'tr',
                             );
-my @member;
+my @member, %memberusername;
 for my $tr (@tr) {
   my @m = map {
     my $anchor = $_;
@@ -71,8 +71,8 @@ for my $m (@member) {
   my ($name, $relurl) = @$m;
   my $absurl = "http://junethack.net" . $relurl;
   my $mfile  = $clansdir . $relurl . ".html";
-  if (not grep { /reparse/} @ARGV) {
-    unlink $mfile;
+  if ((not -e $mfile) or not grep { /reparse/} @ARGV) {
+    unlink $mfile if -e $mfile;
     print "member $name: $absurl => $mfile\n";
     system("wget", '--no-check-certificate', "-O", $mfile, $absurl);
     select undef,undef,undef,0.5;
@@ -82,6 +82,25 @@ for my $m (@member) {
 
   my $mtree = HTML::TreeBuilder->new;
   $mtree->parse_file($mfile);
+
+  my @username;
+  for my $atable (grep {
+    my @th = $_->look_down( _tag => 'th' );
+    ref $th[0] and $th[0]->as_trimmed_text() =~ /Server/ and
+    ref $th[1] and $th[1]->as_trimmed_text() =~ /Account/
+  } $mtree->look_down( _tag  => 'table',
+                       class => 'greytable')) {
+    for my $tr ($atable->look_down( _tag => 'tr',
+                                    class => 'account')) {
+      my ($servertd, $usernametd) = $tr->look_down( _tag => 'td' );
+      if ($servertd and $usernametd) {
+        # For now, we ignore the server name.
+        my ($username) = $usernametd->content()->[0];
+        push @username, $username;
+      }
+    }
+  }
+  $memberusername{$$m[0]} = [uniq(@username)];
 
   my @cab = grep {
     grep { $_->as_trimmed_text() =~ /Trophies/ } $_->look_down( _tag => 'h3' )
@@ -125,6 +144,13 @@ for my $m (@member) {
   $membercount++;
 }
 
+use Data::Dumper;
+my $membersfile = qq[$clansdir/$ourclan-members.pl];
+open MEMBERS, ">", $membersfile;
+print MEMBERS Dumper(+{ memberlist      => [@member],
+                        memberusernames => \%memberusername });
+close MEMBERS;
+
 #use Data::Dumper; print Dumper( +{ variantorder => \%variantorder, trophy => \%trophy });
 #exit 0;
 
@@ -167,3 +193,9 @@ $updated
    } keys %trophy) . qq[
 </tbody></table>
 </body></html>];
+
+
+sub uniq {
+  my %seen;
+  return grep { not $seen{$_}++ } @_;
+}

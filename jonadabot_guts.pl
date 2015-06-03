@@ -1484,6 +1484,12 @@ sub handlemessage {
       # TODO:
       say("Re-initializing file watch pipes is an intended feature but has not yet been implemented, sorry.",
           channel => $howtorespond, fallbackto => 'private', sender => $sender);
+    } elsif ($text =~ /^!reload clanm/) {
+      say("Attempting to reload clan members...",
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
+      my $answer = reloadclanmembers();
+      say($answer,
+          channel => $howtorespond, fallbackto => 'private', sender => $sender);
     } else { # TODO: re-test how well this works in 006, and clean up any non-working bits.
       logit("Reloading multiple components at the request of $sender", 1);
       do $dbcode;
@@ -1856,7 +1862,7 @@ sub biff {
   logit("biff($owner, $saycount, $caller)", 4) if $debug{biff} > 2;
   warn "biff($owner, $saycount, $caller): no owner specified, defaulting to $irc{oper}" if not $owner;
   $owner ||= $irc{oper};
-  warn "biff(): no owner/operator" and return if not $owner;
+  warn "biff($caller): no owner/operator" and return if not $owner;
   my @confkey = map { $$_{mnemonic} } findrecord("popbox", "ownernick", $owner);
   for my $confkey (@confkey) {
     logit("Biff: checking POP3: $confkey", 2);
@@ -2058,6 +2064,94 @@ sub setalarm {
   } else {
     logit("Failed to set alarm: " . $dt . " %arg ($text)");
     say("Failed to set alarm");
+  }
+}
+
+sub reloadclanmembers {
+  my ($membersfile) = getconfigvar($cfgprofile, 'membersfile');
+  if (-e $membersfile) {
+    eval {
+      do $membersfile;
+    };
+    my $ahash  = $$VAR1{memberusernames};
+    my $clan   = getconfigvar($cfgprofile, 'clan')
+      || $irc{clan} || 'demilichens';
+    my $year ||= DateTime->now( @tz )->year();
+    #say("loading " . (keys %$ahash) . " members.",
+    #    channel => 'private',
+    #    sender  => $irc{oper});
+    for my $member (keys %$ahash) {
+      #say("clan member: $member",
+      #    channel => 'private',
+      #    sender  => $irc{oper}) if $debug{clanmembers} > 1;
+      my $mid;
+      my ($rec) = findrecord('clanmemberid',
+                             clanname       => $clan,
+                             year           => $year,
+                             tourneyaccount => $member);
+      if (ref $rec) {
+        $mid = $$rec{id};
+        #say("record exists",
+        #    channel => 'private',
+        #    sender  => $irc{oper}) if $debug{clanmembers} > 9;
+      } else {
+        #say("adding record",
+        #    channel => 'private',
+        #    sender  => $irc{oper}) if $debug{clanmembers} > 8;
+        addrecord('clanmemberid', +{ year           => $year,
+                                     clanname       => $clan,
+                                     tourneyaccount => $member,
+                                     flags          => 'A', # Automated record
+                                   });
+        $mid = $db::added_record_id;
+      }
+      #say("member id: $mid",
+      #    channel => 'private',
+      #    sender  => $irc{oper}) if $debug{clanmembers} > 2;
+      if (ref $$ahash{$member}) {
+        for my $name (@{$$ahash{$member}}) {
+          #sleep 3;
+          #say("server account: $name",
+          #    channel => 'private',
+          #    sender  => $irc{oper}) if $debug{clanmembers} > 2;
+          my @srva = findrecord('clanmembersrvacct',
+                                memberid      => $mid,
+                                serveraccount => $name);
+          if (not scalar @srva) {
+            #sleep 1;
+            #say("adding record",
+            #    channel => 'private',
+            #    sender  => $irc{oper}) if $debug{clanmembers} > 3;
+            eval {
+              addrecord('clanmembersrvacct',
+                        +{ memberid      => $mid,
+                           serveraccount => $name,
+                           servertla     => '   '});
+            };
+            #sleep 1;
+            if ($@) {
+              say("Error: Unable to add clan member server account ($mid, $name).",
+                  channel => 'private',
+                  sender  => $irc{oper});
+              logit("Error: unable to add clan member server account ($mid, $name): $@");
+              print "Error: Unable to add clan member server account ($mid, $name): $@.";
+            } else {
+              say("record id " . $db::added_record_id,
+                  channel => 'private',
+                  sender  => $irc{oper}) if $debug{clanmembers} > 4;
+            }
+          }
+        }
+      } else {
+        logit("Failed to read member names from ahash for $member");
+      }
+    }
+    $irc{demi} = [getclanmemberlist($clan)];
+    return "Loaded list of clan members from $membersfile";
+  } elsif ($membersfile) {
+    return "File not found: $membersfile";
+  } else {
+    return "Config variable 'membersfile' not set.";
   }
 }
 
