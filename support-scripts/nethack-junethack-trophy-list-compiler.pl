@@ -107,6 +107,7 @@ for my $m (@member) {
   } $mtree->look_down( _tag  => 'div',
                        class => qr/trophycabinet/,
                      );
+  if (@cab) {
   my @li = $cab[0]->look_down( _tag  => 'li' );
   for my $li (@li) {
     my $variant  = '[unknown variant]';
@@ -140,6 +141,9 @@ for my $m (@member) {
         push @{$trophy{$variant}{$title}{clanmember}}, $name;
       }
     }
+  }
+  } else {
+    warn "no trophy cabinet for clan member: $m";
   }
   $membercount++;
 }
