@@ -18,7 +18,7 @@
 # SEARCH:  @records = searchrecord(tablename, fieldname, value_substring);
 # COUNT:   %counts  = %{countfield(tablename, fieldname)}; # Returns a hash with counts for each value.
 # COUNT:   %counts  = %{countfield(tablename, fieldname, start_dt, end_dt)}; # Ditto, but within the date range; pass DateTime objects.
-# GET BY DATE:        (Last 3 args optional.  Dates, if specified, must be formatted for MySQL already.)
+# GET BY DATE:        (Last 3 args optional.  Dates, if specified, must be formatted for the database already.)
 #          @records = @{getrecordbydate(tablename, datefield, mindate, maxdate, maxfields)};
 # DELETE:  $result  = deleterecord('tablename', $id);
 
@@ -134,7 +134,7 @@ sub getsince {
 # GETNEW:  @records =   getsince(tablename, datetimefield, datetimeobject);
   my ($table, $dtfield, $dt, $q) = @_;
   die "Too many arguments: getrecord(".(join', ',@_).")" if $q;
-  my $when = DateTime::Format::MySQL->format_datetime($dt);
+  my $when = DateTime::Format::ForDB($dt);
   my $db = dbconn();
   $q = $db->prepare("SELECT * FROM $table WHERE $dtfield >= ?");  $q->execute($when);
   my @answer; my $r;
@@ -145,7 +145,7 @@ sub getsince {
 }
 
 sub getrecordbydate {
-# GET BY DATE:        (Dates, if specified, must be formatted for MySQL already.)
+# GET BY DATE:        (Dates, if specified, must be formatted for the database already.)
 #          @records = @{getrecordbydate(tablename, datefield, mindate, maxdate, maxfields)};
   my ($table, $field, $mindate, $maxdate, $maxfields, $q) = @_;
   die "Too many arguments: getrecordbydate(".(join', ',@_).")" if $q;
@@ -166,7 +166,7 @@ sub getrecordbydate {
   my (@r, $r);
   while ($r = $q->fetchrow_hashref()) { push @r, $r; }
   if ($maxfields and @r > $maxfields) {
-    # Fortuitously, MySQL-formatted datetime strings sort correctly when sorted ASCIIbetically:
+    # Fortuitously, DB-formatted datetime strings sort correctly when sorted ASCIIbetically:
     @r = sort { $$a{$field} <=> $$b{$field} } @r;
     if ($maxdate and not $mindate) {
       # If only the maxdate is specified, we want the _last_ n items before that:
@@ -206,7 +206,7 @@ sub changerecord {
   my $q = $db->prepare("update $table set $field=? where id='$id'");
   my $answer;
   eval { $answer = $q->execute($value); };
-  carp "Unable to change record: $@" if $@;
+  carp "Unable to change record($table, $id, $field, $value): $@" if $@;
   return $answer;
 }
 
@@ -272,8 +272,8 @@ sub countfield {
   }
   my $whereclause;
   if (ref $enddt) {
-    my $start = DateTime::Format::MySQL->format_datetime($startdt);
-    my $end   = DateTime::Format::MySQL->format_datetime($enddt);
+    my $start = DateTime::Format::ForDB($startdt);
+    my $end   = DateTime::Format::ForDB($enddt);
     $whereclause = " WHERE fromtime > '$start' AND fromtime < '$end'";
   }
   for my $field (keys %crit) {
@@ -327,7 +327,7 @@ sub findnull {
   my ($field, $value);
   while (@more) {
     ($field, $value, @more) = @more;
-    croak "findrecord called with unbalanced arguments (no value for $field field)" if not defined $value;
+    croak "findnull called with unbalanced arguments (no value for $field field)" if not defined $value;
     push @field, $field;
     $fv{$field} = $value;
   }
