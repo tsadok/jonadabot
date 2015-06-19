@@ -328,7 +328,7 @@ sub findnull {
   my ($field, $value);
   while (@more) {
     ($field, $value, @more) = @more;
-    croak "findrecord called with unbalanced arguments (no value for $field field)" if not defined $value;
+    croak "findnull called with unbalanced arguments (no value for $field field)" if not defined $value;
     push @field, $field;
     $fv{$field} = $value;
   }
@@ -350,16 +350,26 @@ sub findnull {
 
 sub findrecord {
 # FIND:    @records = findrecord(tablename, fieldname, exact_value [, fieldname, value, ...]);
-  my ($table, $field, $value, @more) = @_;
-  my (%fv, @field);
-  croak "findrecord called with unbalanced arguments (no value for $field field)" if not defined $value;
-  push @field, $field; $fv{$field} = $value;
+  #my ($table, $field, $value, @more) = @_;
+  my ($table, @more) = @_;
+  my (%fv, @field, $field, $value);
+  #croak "findrecord called with unbalanced arguments (no value for $field field)" if not defined $value;
+  #push @field, $field; $fv{$field} = $value;
+  my $caller = undef;
   while (@more) {
     ($field, $value, @more) = @more;
-    croak "findrecord called with unbalanced arguments (no value for $field field)" if not defined $value;
-    push @field, $field;
-    $fv{$field} = $value;
+    if ($field eq '__CALLER__') {
+      $caller = $value;
+    } else {
+      if (not defined $value) {
+        warn "findrecord called by $caller" if defined $caller;
+        croak "findrecord called with unbalanced arguments (no value for $field field)" if not defined $value;
+      }
+      push @field, $field;
+      $fv{$field} = $value;
+    }
   }
+
   my $db = dbconn();
   my $q = $db->prepare("SELECT * FROM $table WHERE " . (join " AND ", map { qq[$_=?] } @field ));
   $q->execute(map { $fv{$_} } @field);

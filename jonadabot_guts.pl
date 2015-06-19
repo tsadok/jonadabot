@@ -2,6 +2,9 @@
 
 use AnyEvent::IRC::Util qw(encode_ctcp);
 
+my @substage = qw(Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda Mu Nu Xi Omicron Pi Rho Sigma Tau Upsilon Phi Chi Psi Omega);
+print " * Substage " . (shift @substage) . " (loading guts)\n";
+
 our %debug = ( # These are the default defaults...
               alarm      => 1,
               biff       => 1,
@@ -30,6 +33,7 @@ sub loaddebuglevels {
   }
 }
 loaddebuglevels();
+print " * Substage " . (shift @substage) . " (loaded debug levels)\n";
 
 %prefdefault = ( # This is the _default_ default, if the operator doesn't set a default in the DB.
                 timezone           => 'UTC',
@@ -41,6 +45,7 @@ sub loadprefdefaults {
   } # And of course that in turn is overridden by user preference, on a per-user basis.
 }
 loadprefdefaults();
+print " * Substage " . (shift @substage) . " (loaded pref defaults)\n";
 
 my $defaultusername = "jonadabot_" . $version . "_" . (65535 + int rand 19450726);
 my $ourclan;
@@ -97,6 +102,7 @@ sub loadconfig {
   undef $irc{colorcache}; # This will get loaded when next used.
 }
 loadconfig();
+print " * Substage " . (shift @substage) . " (loaded config)\n";
 
 our @scriptqueue  = (); # This can stay as a variable, because it gets emptied quickly.
 
@@ -1679,7 +1685,7 @@ sub viewmessage {
   if ($$r{target} eq $arg{sender}) {
     my $dt = DateTime::Format::FromDB($$r{thedate});
     my $date = friendlytime($dt, getircuserpref($$r{target}, 'timezone') || $prefdefault{timezone} || $servertz);
-    say(qq[$sender: $$r{sender} says, $$r{message} (in $$r{channel}, $date)], %arg);
+    say(qq[$$r{target}: $$r{sender} says, $$r{message} (in $$r{channel}, $date)], %arg);
     $$r{status} = 2;
     $$r{statusdate} = DateTime::Format::ForDB(DateTime->now(@tz));
     updaterecord('memorandum', $r);
@@ -2154,5 +2160,7 @@ sub reloadclanmembers {
     return "Config variable 'membersfile' not set.";
   }
 }
+
+print " * Substage " . (shift @substage) . " (loaded guts)\n";
 
 42;
