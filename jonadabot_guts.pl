@@ -1736,24 +1736,27 @@ sub friendlytime {
   my $now = DateTime->now( @tz )->set_time_zone($displaytz);
   my $utc = '';
   if ($displaytz ne ('UTC')) {
-    my $utcnow = DateTime->now( time_zone => 'UTC');
-    $utc = ' (' . $utcnow->hour . ":" . (sprintf "%02d", $utcnow->minute) . ' ' . friendlytz($utcnow) . ')';
+    my $utcwhen = $when->clone->set_time_zone('UTC');
+    $utc = ' (' . $utcwhen->hour . ":" . (sprintf "%02d", $utcwhen->minute) . ' ' . friendlytz($utcwhen) . ')';
   }
   if ($style eq 'announce') {
     return "It is now " . $when->day_name() . ", " . $when->year()
       . ' ' . $when->month_name() . ' ' . $when->mday() . " at " . ampmtime($when)
       . " " . friendlytz($when) . $utc;
   } elsif ($style eq 'alarm') {
-    return ampmtime($when) . " " . friendlytz($when);
+    return ampmtime($when) . " " . friendlytz($when) . $utc;
   } elsif ($style eq 'hms') {
-    return ampmtime($when, 'doseconds') . " " . friendlytz($when);
+    return ampmtime($when, 'doseconds') . " " . friendlytz($when) . $utc;
   } elsif (($when->ymd() eq $now->ymd())
-      or (($when > $now) and $when->clone()->add(hours => 12) < $now)) {
+      or (($when gt $now) and $when->clone()->add(hours => 12) lt $now)) {
     return "at " . ampmtime($when) . " " . friendlytz($when) . $utc;
-  } elsif ($when->clone()->add( days => 5 ) > $now) {
-    return "on " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when);
-  } elsif ($when->clone()->subtract( days => 5) < $now) {
-    return "this past " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when);
+  } elsif ($when->clone()->add( days => 5 ) gt $now) {
+    return "on " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when) . $utc;
+  } elsif ($when->clone()->subtract( days => 5) lt $now) {
+    return "this past " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when) . $utc;
+  } elsif ($when->clone()->add(days => 45) gt $now) {
+    return "on " . $when->month_abbr . " " . $when->mday() . " at " . ampmtime($when)
+      . " " . friendlytz($when) . $utc;
   } else {
     return "on " . $when->ymd() . ".";
   }
