@@ -1089,14 +1089,16 @@ sub handlemessage {
       } elsif (grep { /past/ } @extraarg) {
         @alarm = grep { $$_{alarmdate} le $dbnow } @alarm;
       }
+      @alarm = sort { $$a{alarmdate} cmp $$b{alarmdate} } @alarm;
       if (0 >= scalar @alarm) {
         say("You currently have no " . (@extraarg ? "(@extraarg) " : '') . "alarms set.",
             channel => 'private', sender => $sender);
       } elsif ((getconfigvar($cfgprofile, 'maxlines') || 12) >= scalar @alarm) {
         for my $alarm (@alarm) {
           my $alarmdt = DateTime::Format::FromDB($$alarm{snoozetill} || $$alarm{alarmdate});
-          my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz));
-          say("Alarm $$alarm{id} set to go off $forwhen.", channel => 'private', sender => $sender);
+          my $forwhen = friendlytime($alarmdt, (getircuserpref($sender, 'timezone') || $prefdefault{timezone} || $servertz), 'agenda');
+          my $msg = $$alarm{message};  if (25 < length($message)) { $msg = substr($message, 0, 23) . "..."; }
+          say("Alarm $$alarm{id} set to go off $forwhen: $msg", channel => 'private', sender => $sender);
         }
       } else {
         say("" . @alarm . " alarms: " . (join ", ", map { $$_{id} } @alarm),
@@ -1727,7 +1729,7 @@ sub ampmtime {
 sub friendlytime {
   # TODO: make some parts of this customizable via userpref, beyond just the timezone.
   #       For example, some users may prefer a date order other than year month day.
-  my ($whendt, $displaytz, $style) = @_;
+  my ($whendt, $displaytz, $style, $datestyle) = @_;
   my $when = $whendt->clone();
   $displaytz ||= $prefdefault{timezone} || $servertz || 'UTC';
   $when->set_time_zone($displaytz);
@@ -1746,7 +1748,7 @@ sub friendlytime {
   } elsif ($style eq 'hms') {
     return ampmtime($when, 'doseconds') . " " . friendlytz($when);
   } elsif (($when->ymd() eq $now->ymd())
-      or ($when->clone()->add(hours => 12) > $now)) {
+      or (($when > $now) and $when->clone()->add(hours => 12) < $now)) {
     return "at " . ampmtime($when) . " " . friendlytz($when) . $utc;
   } elsif ($when->clone()->add( days => 5 ) > $now) {
     return "on " . $when->day_name() . " at " . ampmtime($when) . " " . friendlytz($when);
