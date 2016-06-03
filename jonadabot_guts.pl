@@ -132,12 +132,16 @@ sub error {
   logit("ERROR: $errortype: $message");
 }
 
+# Given a clan member ID number, check and see if it's a member of a
+# particular clan (our clan this year being the default one to check).
 sub clanmemberisours {
-  my ($cmid) = @_;
-  my $year = DateTime->now(@tz)->year();
+  my ($cmid, $clan, $year) = @_;
+  $clan ||= $ourclan;
+  $year ||= DateTime->now(@tz)->year();
   my @cmr = grep { ($$_{year} eq $year) and
-                   ($$_{clanname} eq $ourclan)
+                   ($$_{clanname} eq $clan)
                  } findrecord('clanmemberid', 'id', $cmid);
+  return @cmr;
 }
 # The next two functions could be optimized by not bothering to check
 # if the clan member is ours, but then you'd only be able to support
@@ -146,11 +150,11 @@ sub clanmemberisours {
 # to keep last year's data in the database.
 sub playerisclanmember {
   my ($username) = @_;
-  return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembersrvacct', 'serveraccount', $username);
+  return grep { scalar clanmemberisours($$_{memberid}) } findrecord('clanmembersrvacct', 'serveraccount', $username);
 }
 sub nickisclanmember {
   my ($username) = @_;
-  return grep { clanmemberisours($$_{memberid}) } findrecord('clanmembernick', 'nick', $username);
+  return grep { scalar clanmemberisours($$_{memberid}) } findrecord('clanmembernick', 'nick', $username);
 }
 
 sub settimer {
@@ -542,14 +546,19 @@ sub setircuserpref {
 
 sub getclanmemberlist {
   my ($clanname, $year) = @_;
-  my $year  ||= DateTime->now( @tz )->year();
-  my @member  = findrecord('clanmemberid', clanname => $clanname, year => $year );
-  my @nickrec = map { findrecord('clanmembernick',    memberid => $$_{id}) } @member;
-  my @srvarec = map { findrecord('clanmembersrvacct', memberid => $$_{id}) } @member;
-  return uniq((map { $$_{tourneyaccount} } @member),
-              (map { $$_{nick}           } @nickrec),
-              (map { $$_{serveraccount}  } @srvarec),
-             );
+  $clanname ||= $ourclan;
+  $year     ||= DateTime->now( @tz )->year();
+  #my @member  = findrecord('clanmemberid', clanname => $clanname, year => $year );
+  #my @nickrec = map { findrecord('clanmembernick',    memberid => $$_{id}) } @member;
+  #my @srvarec = map { findrecord('clanmembersrvacct', memberid => $$_{id}) } @member;
+  #return uniq((map { $$_{tourneyaccount} } @me cfgprofile => $cfgprofile, enabled => 1,),
+  #            (map { $$_{nick}           } @nickrec),
+  #            (map { $$_{serveraccount}  } @srvarec),
+  #           );
+  return uniq(map {
+    my ($m) = $_;
+    $$m{tourney}, @{$$m{server}}, @{$$m{ircnick}};
+  } clanmembersfromdb($year, $clanname));
 }
 
 sub helpinfo { # To avoid spamming the channel with a ton of irrelevant junk, only
@@ -840,13 +849,10 @@ sub handlemessage {
     if ($irc{okdom}{$howtorespond}) {
       if ($subcommand eq 'list') {
         my $list = join "; ", map {
-          my $midr = $_;
-          my @nick = map { $$_{nick} } sort { $$a{prio} <=> $$b{prio}
-                                            } findrecord('clanmembernick', 'memberid', $$midr{id});
-          my @srva = map { $$_{serveraccount} } findrecord('clanmembersrvacct', 'memberid', $$midr{id});
-          my @alias = grep { $_ ne $$midr{tourneyaccount} } uniq(@nick, @srva);
-          $$midr{tourneyaccount} . ((scalar @alias) ? (qq[ (aka: ] . (join ", ", @alias) . qq[)]) : '');
-        } findrecord('clanmemberid', 'clanname', $ourclan, year => DateTime->now(@tz)->year());
+          my $m = $_;
+          my @alias = grep { $_ ne $$m{tourney} } uniq(@{$$m{ircnick}}, @{$$m{server}});
+          $$m{tourney} . ((scalar @alias) ? (qq[ (aka: ] . (join ", ", @alias) . qq[)]) : '');
+        } clanmembersfromdb();
         say(qq[$ourclan members: $list], channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } elsif ($subcommand eq 'alias') {
         say("Adding IRC nick aliases for clan members is a planned feature.",
@@ -854,11 +860,86 @@ sub handlemessage {
       } elsif ($subcommand eq 'scrape') { # TODO
         say("Scraping the tournament site for new clan members and server accounts is a planned feature.",
             channel => $howtorespond, sender => $sender, fallbackto => 'private');
-      } elsif ($subcommand eq 'add') { # TODO
-        say("Adding members to the clan is a planned feature.",
-            channel => $howtorespond, sender => $sender, fallbackto => 'private');
+      } elsif ($subcommand eq 'add') {
+        my ($rest) = $text =~ /!members?\s*add\s*(.*)/;
+        my ($tourney, @nick, @srva, @err);
+        for my $item (split /\s*[;]\s*/, $rest) {
+          my ($type, $values) = split /[=]/, $item, 2;
+          my @val = split /\s*[,]\s*|\s+/, $values;
+          if (($type =~ /^tou/) or ($type =~ /^jun/)) {
+            my $err;
+            for my $v (@val) {
+              if ($tourney) {
+                $err = "Please add separate 'clan members' for each tournament account, even if they use the same IRC nick(s).";
+              } else {
+                $tourney = $v;
+              }}
+            push @err, $err if $err;
+          } elsif (($type =~ /^se?rv/) or ($type =~ /^(NAO|NAO_NH36|EUN|NH4|GHO|ESM|ESM_NH36|ESM_SLEX|NDN|NDN_(NAO|UNH|DNH|DYN|SLTH?|NH4K?|FIQ))$/)) {
+            push @srva, $_ for split /\s*[,]\s*|\s+/, $values;
+          } elsif (($type =~ /^irc/) or ($type =~ /^nic/)) {
+            push @nick, $_ for split /\s*[,]\s*|\s+/, $values;
+          } else {
+            push @err, ("Not sure how to parse $item; see " . (getconfigvar($cfgprofile, 'helpurl') || helpinfo()));
+          }
+        }
+        if (@err) {
+          say("$sender: $_", channel => $howtorespond, sender => $sender, fallbackto => 'private') for @err;
+        } elsif (not $tourney) {
+          say("$sender: You forgot to specify the tournament account name.", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+        } else {
+          my @existing = clanmembersfromdb();
+          if (grep { $$_{tourney} eq $tourney } @existing) {
+            say("$sender: there is already a clan member with tournament account $tourney", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+          } else {
+            my $year = DateTime->now(@tz)->year();
+            my $errorcount = 0;
+            my $result = addrecord("clanmemberid", +{ year           => $year,
+                                                      clanname       => $ourclan,
+                                                      tourneyaccount => $tourney,
+                                                      flags          => "I"}); # I means added via the IRC interface.
+            if ($result) {
+              my $id = $db::added_record_id;
+              my @fail;
+              for my $s (@srva) {
+                my $result = addrecord("clanmembersrvacct", +{ memberid      => $id,
+                                                               serveraccount => $s, });
+                if (not $result) {
+                  $errorcount++;
+                  push @fail, $s;
+                }}
+              if (@fail) {
+                say("$sender: Failed to add the following server account" . ((scalar(@fail) > 1) ? "s" : "") . " to my db: @fail; bug $irc{oper} to fix me.", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+              }
+              @fail = ();
+              my $count = 0;
+              for my $n (@nick) {
+                my $result = addrecord("clanmembernick", +{ memberid => $id,
+                                                            nick     => $n,
+                                                            prio     => $count++, });
+                if (not $result) {
+                  $errorcount++;
+                  push @fail, $n;
+                }
+                if (@fail) {
+                  say("$sender: Failed to add the following IRC nick" . ((scalar(@fail) > 1) ? "s" : "") . " to my db: @fail; bug $irc{oper} to fix me.", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+                }
+              }
+            } else {
+              $errorcount++;
+              say("$sender: I seem to have failed to add the tournament account $tourney to my db; bug $irc{oper} to fix me.", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            }
+            if (not $errorcount) {
+              my $aka = join ", ", uniq(@srva, @nick);
+              $aka = " (aka $aka)" if $aka;
+              say("$sender: $tourney added successfully$aka.", channel => $howtorespond, sender => $sender, fallbackto => 'private');
+            }
+          }
+        }
+        #say("Adding members to the clan is a planned feature.",
+        #    channel => $howtorespond, sender => $sender, fallbackto => 'private');
       } elsif ($subcommand eq 'subtract') { # TODO
-        say("Removing members from the clan is a planned feature.",
+        say("Removing members from the clan is a planned feature.  (Check with $irc{oper} about doing it manually.)",
             channel => $howtorespond, sender => $sender, fallbackto => 'private');
       }}
   } elsif ($text =~ /^!gt\s*(.*)/) {
@@ -877,12 +958,11 @@ sub handlemessage {
     if ($irc{okdom}{$howtorespond}) {
       my @item;
       my %special = (
-                     role => [qw(Val Val Val Val Val Val Val
-                                 Sam Sam Sam Sam Sam
-                                 Arc Bar Cav Hea Kni Mon Pri Ran
-                                 Rog Tou Tou Wiz )],
+                     role => [qw(Val Val Val Sam Sam Sam Bar Bar Bar
+                                 Arc Cav Hea Kni Mon Pri Ran Rog Wiz
+                                 Tou Tou Tou Tou Tou Tou Tou Tou Tou )],
                      race => [qw(Human Human Human Human
-                                 Dwarf Dwarf Elf Elf
+                                 Dwarf Dwarf Elf Elf Sylph
                                  Gnome Gnome Gnome Orc)],
                     );
       if ($special{lc $command}) {
@@ -979,7 +1059,8 @@ sub handlemessage {
     }
     if (($howtorespond eq 'private') or ($irc{okdom}{$howtorespond})) {
       say($answer, channel => $howtorespond, sender => $sender, fallbackto => 'private'  );
-    } elsif ($irc{master}{$sender} or $fallbacktoprivate) {
+    } else {
+#    } elsif ($irc{master}{$sender} or $fallbacktoprivate) {
       #$answer =~ s/\bhere\b/in $howtorespond/;
       say($answer, channel => 'private', sender => $sender, fallbackto => 'private' );
     }
@@ -1538,12 +1619,18 @@ sub handlemessage {
               # however this is unlikely, unless one of the bots involved is lagging
               # rather noticeably or becomes entirely unreachable (e.g., netsplit).
             } elsif ($$t{flags} =~ /R/) { # R means Routine bottrigger, as opposed to flat text
+              say("DEBUG: Routine trigger: $text", channel => 'private', sender => $irc{oper}) if $debug{bottrigger} > 1;
               if ($routine{$$t{answer}}) {
+                say("DEBUG: Calling routine: $$t{answer}", channel => 'private', sender => $irc{oper}) if $debug{bottrigger} > 1;
                 my $response = $routine{$$t{answer}}->($$t{bottrigger}, channel => $howtorespond, text => $text, sender => $sender);
                 # TODO: pass more args there to allow routines more flexibility in what they can do.
-                if ($response) {
-                  say($response, channel => $howtorespond, sender => $sender, fallbackto => 'private')
+                if ($response and ($response ne '__DONE__')) {
+                  logit("Got response from routine $$t{answer}; sending it to $howtorespond or $sender") if $debug{bottrigger};
+                  say($response, channel => $howtorespond, sender => $sender, fallbackto => 'private');
+                } elsif ($response) {
+                  logit("Got __DONE__ response from routine $$t{answer}") if $debug{bottrigger};
                 } else {
+                  say("DEBUG: No response from routine: $$t{answer} for bottrigger $$t{bottrigger}", channel => 'private', sender => $irc{oper}) if $debug{bottrigger};
                   logit("No response from routine $$t{answer} for bottrigger $$t{bottrigger}"); # always log this; it's an error
                 }
               } else {
@@ -2078,92 +2165,110 @@ sub setalarm {
   }
 }
 
+sub clanmembersfromdb {
+  my ($year, $clan) = @_;
+  $year ||= DateTime->now(@tz)->year();
+  $clan ||= $ourclan;
+  return map {
+    my $midr = $_;
+    my @nick = map { $$_{nick} } sort { $$a{prio} <=> $$b{prio}
+                                      } findrecord('clanmembernick', 'memberid', $$midr{id});
+    my @srva = map { $$_{serveraccount} } findrecord('clanmembersrvacct', 'memberid', $$midr{id});
+    +{ tourney => $$midr{tourneyaccount},
+       ircnick => \@nick,
+       server  => \@srva,
+     };
+  } findrecord('clanmemberid', 'clanname', $clan, year => $year, enabled => 1);
+}
+
 sub reloadclanmembers {
-  my ($membersfile) = getconfigvar($cfgprofile, 'membersfile');
-  if (-e $membersfile) {
-    eval {
-      do $membersfile;
-    };
-    my $ahash  = $$VAR1{memberusernames};
-    my $clan   = getconfigvar($cfgprofile, 'clan')
-      || $irc{clan} || 'demilichens';
-    my $year ||= DateTime->now( @tz )->year();
-    #say("loading " . (keys %$ahash) . " members.",
-    #    channel => 'private',
-    #    sender  => $irc{oper});
-    for my $member (keys %$ahash) {
-      #say("clan member: $member",
-      #    channel => 'private',
-      #    sender  => $irc{oper}) if $debug{clanmembers} > 1;
-      my $mid;
-      my ($rec) = findrecord('clanmemberid',
-                             clanname       => $clan,
-                             year           => $year,
-                             tourneyaccount => $member);
-      if (ref $rec) {
-        $mid = $$rec{id};
-        #say("record exists",
-        #    channel => 'private',
-        #    sender  => $irc{oper}) if $debug{clanmembers} > 9;
-      } else {
-        #say("adding record",
-        #    channel => 'private',
-        #    sender  => $irc{oper}) if $debug{clanmembers} > 8;
-        addrecord('clanmemberid', +{ year           => $year,
-                                     clanname       => $clan,
-                                     tourneyaccount => $member,
-                                     flags          => 'A', # Automated record
-                                   });
-        $mid = $db::added_record_id;
-      }
-      #say("member id: $mid",
-      #    channel => 'private',
-      #    sender  => $irc{oper}) if $debug{clanmembers} > 2;
-      if (ref $$ahash{$member}) {
-        for my $name (@{$$ahash{$member}}) {
-          #sleep 3;
-          #say("server account: $name",
-          #    channel => 'private',
-          #    sender  => $irc{oper}) if $debug{clanmembers} > 2;
-          my @srva = findrecord('clanmembersrvacct',
-                                memberid      => $mid,
-                                serveraccount => $name);
-          if (not scalar @srva) {
-            #sleep 1;
-            #say("adding record",
-            #    channel => 'private',
-            #    sender  => $irc{oper}) if $debug{clanmembers} > 3;
-            eval {
-              addrecord('clanmembersrvacct',
-                        +{ memberid      => $mid,
-                           serveraccount => $name,
-                           servertla     => '   '});
-            };
-            #sleep 1;
-            if ($@) {
-              say("Error: Unable to add clan member server account ($mid, $name).",
-                  channel => 'private',
-                  sender  => $irc{oper});
-              logit("Error: unable to add clan member server account ($mid, $name): $@");
-              print "Error: Unable to add clan member server account ($mid, $name): $@.";
-            } else {
-              say("record id " . $db::added_record_id,
-                  channel => 'private',
-                  sender  => $irc{oper}) if $debug{clanmembers} > 4;
-            }
-          }
-        }
-      } else {
-        logit("Failed to read member names from ahash for $member");
-      }
-    }
-    $irc{demi} = [getclanmemberlist($clan)];
-    return "Loaded list of clan members from $membersfile";
-  } elsif ($membersfile) {
-    return "File not found: $membersfile";
-  } else {
-    return "Config variable 'membersfile' not set.";
-  }
+  $irc{demi} = [ getclanmemberlist($ourclan) ];
+  return "Clan members: " . (join ", ", @{$irc{demi}});
+#  my ($membersfile) = getconfigvar($cfgprofile, 'membersfile');
+#  if (-e $membersfile) {
+#    eval {
+#      do $membersfile;
+#    };
+#    my $ahash  = $$VAR1{memberusernames};
+#    my $clan   = getconfigvar($cfgprofile, 'clan')
+#      || $irc{clan} || 'demilichens';
+#    my $year ||= DateTime->now( @tz )->year();
+#    #say("loading " . (keys %$ahash) . " members.",
+#    #    channel => 'private',
+#    #    sender  => $irc{oper});
+#    for my $member (keys %$ahash) {
+#      #say("clan member: $member",
+#      #    channel => 'private',
+#      #    sender  => $irc{oper}) if $debug{clanmembers} > 1;
+#      my $mid;
+#      my ($rec) = findrecord('clanmemberid',
+#                             clanname       => $clan,
+#                             year           => $year,
+#                             tourneyaccount => $member);
+#      if (ref $rec) {
+#        $mid = $$rec{id};
+#        #say("record exists",
+#        #    channel => 'private',
+#        #    sender  => $irc{oper}) if $debug{clanmembers} > 9;
+#      } else {
+#        #say("adding record",
+#        #    channel => 'private',
+#        #    sender  => $irc{oper}) if $debug{clanmembers} > 8;
+#        addrecord('clanmemberid', +{ year           => $year,
+#                                     clanname       => $clan,
+#                                     tourneyaccount => $member,
+#                                     flags          => 'A', # Automated record
+#                                   });
+#        $mid = $db::added_record_id;
+#      }
+#      #say("member id: $mid",
+#      #    channel => 'private',
+#      #    sender  => $irc{oper}) if $debug{clanmembers} > 2;
+#      if (ref $$ahash{$member}) {
+#        for my $name (@{$$ahash{$member}}) {
+#          #sleep 3;
+#          #say("server account: $name",
+#          #    channel => 'private',
+#          #    sender  => $irc{oper}) if $debug{clanmembers} > 2;
+#          my @srva = findrecord('clanmembersrvacct',
+#                                memberid      => $mid,
+#                                serveraccount => $name);
+#          if (not scalar @srva) {
+#            #sleep 1;
+#            #say("adding record",
+#            #    channel => 'private',
+#            #    sender  => $irc{oper}) if $debug{clanmembers} > 3;
+#            eval {
+#              addrecord('clanmembersrvacct',
+#                        +{ memberid      => $mid,
+#                           serveraccount => $name,
+#                           servertla     => '   '});
+#            };
+#            #sleep 1;
+#            if ($@) {
+#              say("Error: Unable to add clan member server account ($mid, $name).",
+#                  channel => 'private',
+#                  sender  => $irc{oper});
+#              logit("Error: unable to add clan member server account ($mid, $name): $@");
+#              print "Error: Unable to add clan member server account ($mid, $name): $@.";
+#            } else {
+#              say("record id " . $db::added_record_id,
+#                  channel => 'private',
+#                  sender  => $irc{oper}) if $debug{clanmembers} > 4;
+#            }
+#          }
+#        }
+#      } else {
+#        logit("Failed to read member names from ahash for $member");
+#      }
+#    }
+#    $irc{demi} = [getclanmemberlist($clan)];
+#    return "Loaded list of clan members from $membersfile";
+#  } elsif ($membersfile) {
+#    return "File not found: $membersfile";
+#  } else {
+#    return "Config variable 'membersfile' not set.";
+#  }
 }
 
 print " * Substage " . (shift @substage) . " (loaded guts)\n";
