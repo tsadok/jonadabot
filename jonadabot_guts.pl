@@ -883,7 +883,9 @@ sub handlemessage {
             push @err, ("Not sure how to parse $item; see " . (getconfigvar($cfgprofile, 'helpurl') || helpinfo()));
           }
         }
-        if (@err) {
+        if ((not $irc{master}{$sender}) and not nickisclanmember($sender)) {
+          say("Sorry, but only a member of $ourclan, or my master, can add clan members.", channel => 'private', sender => $sender);
+        } elsif (@err) {
           say("$sender: $_", channel => $howtorespond, sender => $sender, fallbackto => 'private') for @err;
         } elsif (not $tourney) {
           say("$sender: You forgot to specify the tournament account name.", channel => $howtorespond, sender => $sender, fallbackto => 'private');

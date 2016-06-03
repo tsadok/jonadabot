@@ -376,7 +376,7 @@ sub findrecord {
   eval {
     $q = $db->prepare($querytext);
   };
-  if ($@) {
+  if ($@ or not $q) {
     warn "findrecord: encountered an error ($@) while constructing the query: querytext";
     warn "called as findrecord(@_)";
     #warn "findrecord was called by $caller" if defined $caller;
