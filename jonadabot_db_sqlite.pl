@@ -371,7 +371,17 @@ sub findrecord {
   }
 
   my $db = dbconn();
-  my $q = $db->prepare("SELECT * FROM $table WHERE " . (join " AND ", map { qq[$_=?] } @field ));
+  my $querytext = "SELECT * FROM $table WHERE " . (join " AND ", map { qq[$_=?] } @field );
+  my $q;
+  eval {
+    $q = $db->prepare($querytext);
+  };
+  if ($@) {
+    warn "findrecord: encountered an error ($@) while constructing the query: querytext";
+    warn "called as findrecord(@_)";
+    #warn "findrecord was called by $caller" if defined $caller;
+    return;
+  }
   $q->execute(map { $fv{$_} } @field);
   my @answer; my $r;
   while ($r = $q->fetchrow_hashref()) {
