@@ -4,7 +4,7 @@ sub tea {
   my $stepbystep = (defined $arg{stepbystep}) ? $arg{stepbystep}
     : 0;#((rand(100) > 95) ? 1 : 0);
   my @bev = ('black tea', 'green tea', 'herbal tea', 'white tea',
-             'oolang tea', 'chocolate', 'chai', 'juice');
+             'oolong tea', 'chocolate', 'chai', 'juice');
   my $bev = $arg{bev} || $bev[int rand int rand @bev];
   return juice(%arg) if $bev eq 'juice';
   print " * BEV: $bev\n" if $debug{tea} > 4;
@@ -13,7 +13,7 @@ sub tea {
                 'green tea'  => ['water', 'milk'],
                 'herbal tea' => ['water'],
                 'white tea'  => ['water'],
-                'oolang tea' => ['water'],
+                'oolong tea' => ['water'],
                 'chocolate'  => ['milk', 'milk', 'milk', "goat's milk", "soy milk", 'seal milk', ],
                 'chai'       => ['milk', "water", "goat's milk", "soy milk", "industrial solvent", ],
                );
@@ -199,7 +199,7 @@ sub tea {
     my %lessdetail = ( 'black tea'  => 'tea',
                        'green tea'  => 'tea',
                        'white tea'  => 'tea',
-                       'oolang tea' => 'tea',
+                       'oolong tea' => 'tea',
                      );
     $beverage = $lessdetail{$bev} || $bev;
   } elsif ($detailedbev{$bev}) {

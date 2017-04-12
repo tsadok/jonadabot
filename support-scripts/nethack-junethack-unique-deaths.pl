@@ -1,11 +1,13 @@
 #!/usr/bin/perl -w
 # -*- cperl -*-
 
-our $ourclan  = 'newts';
+use HTML::Entities;
+
+our $ourclan  = 'Splat';
 our $tempdir  = '/b4/perl/nethack-junethack-unique-deaths-tempdir';
 our $result   = '/var/www/nethack-stuff/deaths-needed.html';
 our $altres   = '/var/www/nethack-stuff/deaths-obtained.html';
-our $tourney  = 'https://junethack.net';
+#our $pending  = '/b4/perl/nethack-junethack-bonemon-deaths.txt';
 
 our $theclan  = $ourclan;
 my  @clanarg  = grep { /^clan=/ } @ARGV;
@@ -15,23 +17,20 @@ if (@clanarg) {
   $altres     = qq[/var/www/nethack-stuff/deaths-obtained-$theclan.html];
 }
 
-our %clan = ( # TODO: put this in the database
-             kitten   => 'BittenByAKitten',
-             awesome  => 'ClanAwesome',
-             cookies  => 'Dropped_Cookies',
-             goons    => 'GoonsInJune',
-             explodes => 'ItExplodes',
-             smile    => 'SmileMold',
-             bots     => 'bothack',
-             newts    => 'deminewts',
-             ddpp     => 'dingdongpingpong', # kerio is a boat
-             fantasy  => 'fantasy',
-             fwil     => 'fwilclan',
-             overcaff => 'overcaffeinated',
-             splat    => 'teamsplat',
-            );
-
-my %clanpage = map { $_ => qq[$tourney/clan/$clan{$_}] } keys %clan;
+my %clanpage = ( # TODO: construct this list by scraping it from the junethack site.
+                Corpses  => 'https://junethack.net/clan/Corpses',
+                Cthulhus => 'https://junethack.net/clan/demiCthulhus',
+                Determin => 'https://junethack.net/clan/Determination',
+                Goons    => 'https://junethack.net/clan/GoonsInJune',
+                IQUIT    => 'https://junethack.net/clan/IQUIT',
+                Lichens  => 'https://junethack.net/clan/demilichens',
+                Molds    => 'https://junethack.net/clan/SmileMold',
+                Rolled   => 'https://junethack.net/clan/IROLLEDA3',
+                SOR      => 'https://junethack.net/clan/SOR',
+                Splat    => 'https://junethack.net/clan/TeamSplat',
+                STDs     => 'https://junethack.net/clan/SlexuallyTransmittedDisease',
+                unfoog   => 'https://junethack.net/clan/unfoog',
+               );
 
 my (%death, %clandeath);
 
@@ -83,6 +82,61 @@ for my $clan (keys %clanpage) {
                  } @tr;
   }
   sleep 1 unless grep { /reparse|partial/ } @ARGV;
+}
+
+#if (grep { /PENDING/ } @ARGV) {
+#  $result =~ s/needed/needed-pending.html/;
+#  $altres =~ s/obtained/obtained-pending.html/;
+#  open PENDING, "<", $pending;
+#  for my $p (grep { $_ and not $death{$_}{$ourclan}
+#                  } map { chomp; qq[<td>$_</td>]
+#                        } map {
+#                          encode_entities($_)
+#                        } <PENDING>) {
+#    $death{__TOTAL__}{$p}++;
+#    $death{$p}{$ourclan}++;
+#    $clandeath{$ourclan}++;
+#  }
+#}
+
+if (grep { /COUNTCATEGORIES/ } @ARGV) {
+  print "\nTotal unique deaths:       " . (keys %death) . "\n\n";
+  my @shk       = map { decode_entities($_) } grep { /shopkeeper/i } keys %death;
+  my @shkmagmis = grep { /s magic missile/i } @shk;
+  my @shkstrike = grep { /s wand/i } @shk;
+  my @shkmelee  = grep { /shopkeeper(?!\S+s )/ } @shk;
+  print "Shopkeeper-related deaths: " . @shk . "
+      in melee:            " . @shkmelee . "
+      wand (of striking):  " . @shkstrike . "
+      magic missile:       " . @shkmagmis . "
+      other:               " . ((scalar @shk) - (scalar @shkstrike) - (scalar @shkmagmis) - (scalar @shkmelee)) . "\n";
+  my @wrath = grep { /the wrath of/i } keys %death;
+  my $minionre = qr/(\w+ elemental|couatl|hezrou|marilith|\w+cubus|Aleax|\w+ devil) of ([A-Z]\w+)/i;
+  my ($minion, %minion, %diety); for my $d (grep { $_ =~ $minionre } keys %death) {
+    $d =~ $minionre;
+    my ($min, $diety) = ($1, $2);
+    $minion{$min}++; $diety{$diety}++; $minion++;
+  }
+  print "Divine Wrath:              " . @wrath
+    . "\nDivine Minion:             " . $minion . "
+     " . (join "\n     ", map { $_ . ((join "", map { " " } 1 .. (27 - length $_))) . $minion{$_}
+                              } sort { $minion{$b} <=> $minion{$a} } keys %minion) . "\n";
+  print "Dieties Represented:       " . (keys %diety) . "\n";
+
+  my @rot  = grep { />poisoned by a rotted .*corpse/ } keys %death;
+  my @dead = grep { />dead / } keys %death;
+  print "Rotted Corpses:            " . @rot
+    . "\nDead Monsters:             " . @dead . "\n";
+  # TODO: (possibly racial) priests and priestesses of dieties, random monster's foo, rotted corpse of foo
+
+  print "\n";
+  exit 0;
+}
+
+if (grep { /DEBUG/ } @ARGV) {
+  use Data::Dumper;
+  print Dumper(\%death);
+  exit 0;
 }
 
 my $maxclandeath = 0;

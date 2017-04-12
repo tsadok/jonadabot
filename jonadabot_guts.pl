@@ -2180,7 +2180,7 @@ sub clanmembersfromdb {
        ircnick => \@nick,
        server  => \@srva,
      };
-  } findrecord('clanmemberid', 'clanname', $clan, year => $year, enabled => 1);
+  } findrecord('clanmemberid', 'clanname', $clan, year => $year);
 }
 
 sub reloadclanmembers {
