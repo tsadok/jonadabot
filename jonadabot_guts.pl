@@ -1900,7 +1900,18 @@ sub biffhelper {
           }
         } elsif ($field ne uc $field) { # mixed-case fields are header fields
           if ($msgnum) {
-            my @h = grep { /^$field/ } $pop->Head($msgnum);
+            my @h = map {
+              my $raw = $_;
+              my $subj = $raw;
+              if ($raw =~ /^(.*?)=[?]utf-8[?]B[?]([^=?]+)==[?]=(.*)$/) {
+                my ($before, $enc, $after) = ($1, $2, $3);
+                eval {
+                  use MIME::Base64;
+                  $subj = $before . decode_base64($enc) . $after;
+                };
+              }
+              $subj;
+            } grep { /^$field/ } $pop->Head($msgnum);
             if (scalar @h) {
               if ($irc{maxlines} >= scalar @h) {
                 push @answer, ($_ . qq{ [$popbox:$msgnum]}) for @h;
