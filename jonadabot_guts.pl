@@ -1,10 +1,12 @@
 #!/usr/bin/perl
 
+use DateTime;
 use AnyEvent::IRC::Util qw(encode_ctcp);
 
 my @substage = qw(Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota Kappa Lambda Mu Nu Xi Omicron Pi Rho Sigma Tau Upsilon Phi Chi Psi Omega);
 print " * Substage " . (shift @substage) . " (loading guts)\n";
 
+my $lastsaytime = DateTime->now();
 our %debug = ( # These are the default defaults...
               alarm      => 1,
               biff       => 1,
@@ -459,6 +461,11 @@ sub parseprefix { # This function needs work.  I'm still finding cases it
 
 sub say {
   my ($message, %arg) = @_;
+  my $saytime = DateTime->now();
+  if ($saytime->hms() eq $lastsaytime->hms()) {
+      select undef, undef, undef, 0.5 + rand 1;
+      $saytime = DateTime->now();
+  }
   print $message . "\n" if $debug{say};
   my $target = ($arg{channel} eq 'private') ? $arg{sender} : $arg{channel};
   logit("say [to $target]: $message") if $debug{say} > 1;
@@ -505,6 +512,7 @@ sub say {
       }
     }
   }
+  $lastsaytime = $saytime;
 }
 
 sub getircuserpref {
@@ -798,13 +806,13 @@ sub handlemessage {
     if (rand(100) > 98) { $recipient = $sender; }
     juice(recipient => $recipient, channel    => $howtorespond,
           sender    => $sender,    fallbackto => 'private');
-  } elsif ($text =~ /^!(coffee|beer|wine|booze|sake)\s*(.*)/) {
-    my ($bev, $recipient) = ($1, $2);
-    $recipient ||= $sender;
-    my $pronoun = (getconfigvar($cfgprofile, 'botismale') ? "his" : "her");
-    # Why is jonadabot styled female by default?  Because during early development it used the nick "Arsinoe".
-    say("/me holds $pronoun nose and throws a mug of cold black coffee at $recipient",
-        channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
+  #} elsif ($text =~ /^!(coffee|beer|wine|booze|sake)\s*(.*)/) {
+  #  my ($bev, $recipient) = ($1, $2);
+  #  $recipient ||= $sender;
+  #  my $pronoun = (getconfigvar($cfgprofile, 'botismale') ? "his" : "her");
+  #  # Why is jonadabot styled female by default?  Because during early development it used the nick "Arsinoe".
+  #  say("/me holds $pronoun nose and throws a mug of cold black coffee at $recipient",
+  #      channel => $howtorespond, sender => $sender, fallbackto => 'private') if $irc{okdom}{$howtorespond};
   } elsif ($text =~ /^!deaths?\s*(.*)/) { # TODO: generalize this by allowing commands/scripts to be listed in the DB.
     my @extraarg = grep { /^(reparse|partial|url|clan=\w+)$/ } split /\s+/, $1;
     my $sayresults = sub {
@@ -1362,12 +1370,15 @@ sub handlemessage {
         logit("request is for message $msgnum", 4) if $debug{biff} > 2;
         my (@field) = split /\s+/, $therest;
         push @field, 'Subject' if not @field;
+	my $delay = 1;
         for my $field (grep { $_ ne uc $_ } @field) { # mixed-case fields are header fields
           for my $msg (biffhelper($popbox, $msgnum, [$field], 'suppresswatch', $sender, 'handlemessage (box-specific)')) {
             say($msg, channel => 'private', sender => $sender);
-            select undef,undef,undef,0.2;
+	    $delay = ($delay * 1.5) + 2;
+            sleep int $delay;
           }
-        } # TODO: make biffhelper support this stuff too, get rid of the grep, and simplify.
+        }
+	# TODO: make biffhelper support this stuff too, get rid of the grep, and simplify.
         if (grep { $_ eq uc $_ } @field) {
           # All-uppercase fields are magic.
           warn "!biff (position 2): No sender means no ownernick" if not $sender;
