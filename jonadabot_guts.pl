@@ -1534,12 +1534,13 @@ sub handlemessage {
   } elsif ($text =~ /^!nick\s*(\w+)/) {
     my ($nick) = $1;
     my %isnick = map { $_ => 1 } (getconfigvar($cfgprofile, 'ircnick'), $defaultusername);
-    if (($irc{master}{$sender} or getconfigvar($cfgprofile, 'allownicktrigger'))
-        and $isnick{$nick}) {
+    if ($irc{master}{$sender} or (getconfigvar($cfgprofile, 'allownicktrigger')
+                                  and $isnick{$nick})) {
       logit("/nick $nick at the request of $sender");
       $irc->send_srv( NICK => $nick );
+      $irc->send_srv( PRIVMSG => $irc{nsrv}, "GROUP" );
     }
-  } elsif ($text =~ /^!join ([#]+\w+(?:[-]\w+)*)/ and $irc{master}{$sender}) {
+  } elsif ($text =~ /^!join ([#]+\w+(?:[.-]\w+)*)/ and $irc{master}{$sender}) {
     my ($ch) = ($1);
     logit("Attempting to /join $ch at the request of $sender");
     $irc->send_srv( JOIN => $ch );
