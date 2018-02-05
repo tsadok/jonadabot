@@ -1604,8 +1604,14 @@ sub handlemessage {
       loadconfig();
       logit("Reload complete.", 1);
     }
+  #} elsif ($text =~ /^[>][?]/) {
+  #  # Special case, proxy to Rodney's learndb.
+  #  say($text, channel => "private", sender => "Rodney");
+  #  $irc{echo}{Rodney}{private}{count}++;
+  #  $irc{echo}{Rodney}{private}{channels} = [ $howtorespond ];
+  #  push @{$irc{echo}{Rodney}{private}{fallback}}, $sender;
   } elsif ($text =~ /^!(\w+)/ and (@rec = findrecord("bottrigger", "bottrigger", $1, "enabled", 1))) {
-    logit("Can't Happen: no bottrigger record for $text") if not @rec;
+    #logit("Can't Happen: no bottrigger record for $text") if not @rec;
     for my $t (@rec) {
       if ((not $$t{channel}) or (index($$t{channel}, $howtorespond) > 0) or ($howtorespond eq 'private')) {
         if (($irc{okdom}{$howtorespond}) or (not ($$t{flags} =~ /C/))
